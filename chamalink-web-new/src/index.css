@@ -1,0 +1,136 @@
+@import "tailwindcss";
+
+@theme {
+  /* ChamaLink design tokens - see design plan: ledger-indigo + earthen
+     gold, not the generic cream/terracotta/SaaS-card defaults. */
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  --color-ink-950: #0f1b30;
+  --color-ink-900: #152a4e;
+  --color-ink-800: #1c3760;
+  --color-ink-700: #2a4a7d;
+  --color-ink-600: #3d5f97;
+  --color-ink-500: #5b7bb3;
+  --color-ink-100: #e4e9f3;
+  --color-ink-50: #f1f4f9;
+
+  --color-gold-700: #9c6a1f;
+  --color-gold-600: #c98a2e;
+  --color-gold-500: #dba24b;
+  --color-gold-100: #f6e7cc;
+
+  --color-paper: #f4f4ef;
+  --color-paper-raised: #fdfdfb;
+
+  --color-standing-good: #2f6f4e;
+  --color-standing-good-bg: #e5f0e9;
+  --color-standing-warn: #b8792a;
+  --color-standing-warn-bg: #f6ead7;
+  --color-standing-overdue: #a13d2e;
+  --color-standing-overdue-bg: #f6e1dd;
+
+  /* Tokens za kimaana (semantic) — thamani zake zinabadilika kwenye dark */
+  --color-on-accent: #ffffff; /* maandishi juu ya rangi kali (standing-good/overdue) */
+  --color-on-gold: #0f1b30; /* maandishi juu ya gold-500 */
+  --color-overlay: rgb(15 27 48 / 0.4); /* kivuli nyuma ya dirisha/paneli */
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-paper);
+  color: var(--color-ink-950);
+}
+
+/* Financial figures always use tabular, monospaced numerals - this is
+   the one deliberate "material" choice that separates ChamaLink's
+   ledger-like data density from a generic dashboard. */
+.figure {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ======================================================================
+   DARK MODE — tokens pekee zinabadilika; kurasa hazina rangi za moja kwa moja.
+   Mbinu: ngazi ya "ink" inageuzwa (950 = maandishi angavu zaidi, 50 = uso wa giza),
+   kwa hiyo jozi za ink/ink (mf. bg-ink-900 + text-ink-50) zinabaki zinasomeka.
+   Kila rangi ya maandishi imepimwa kwa WCAG dhidi ya paper na paper-raised
+   (scripts/contrast-check.mjs): maandishi ya kawaida >= 4.5:1.
+   ====================================================================== */
+html[data-theme='dark'],
+html[data-theme='dark'] .theme-chrome .theme-surface {
+  --color-ink-950: #f3f6fb;
+  --color-ink-900: #e6ebf4;
+  --color-ink-800: #d0d9e8;
+  --color-ink-700: #b9c6dc;
+  --color-ink-600: #a3b3cf;
+  --color-ink-500: #8a9dc0;
+  --color-ink-100: #2a3854;
+  --color-ink-50: #19243b;
+
+  --color-gold-700: #ecc27a;
+  --color-gold-600: #e3ad57;
+  --color-gold-500: #e8b865;
+  --color-gold-100: #3b2d15;
+
+  --color-paper: #0c1322;
+  --color-paper-raised: #131c30;
+
+  --color-standing-good: #74d3a0;
+  --color-standing-good-bg: #11291e;
+  --color-standing-warn: #f2b866;
+  --color-standing-warn-bg: #33240f;
+  --color-standing-overdue: #ff9585;
+  --color-standing-overdue-bg: #3b1915;
+
+  --color-on-accent: #0c1322;
+  --color-on-gold: #0c1322;
+  --color-overlay: rgb(0 0 0 / 0.6);
+}
+
+/* Maeneo ya "chrome" (kichwa cha ukurasa, paneli ya kuingia, kodi ya kujiunga) yanabaki bluu-giza
+   kwenye mwonekano wowote: ndani yake tokens za ink/gold zinarudi kwenye thamani za light.
+   Paneli inayofunguka ndani ya chrome (mf. menyu ya vikundi) inatumia .theme-surface kurudi kwenye dark. */
+html[data-theme='dark'] .theme-chrome {
+  --color-ink-950: #0f1b30;
+  --color-ink-900: #152a4e;
+  --color-ink-800: #1c3760;
+  --color-ink-700: #2a4a7d;
+  --color-ink-600: #3d5f97;
+  --color-ink-500: #5b7bb3;
+  --color-ink-100: #e4e9f3;
+  --color-ink-50: #f1f4f9;
+  --color-gold-500: #dba24b;
+  --color-on-gold: #0f1b30;
+}
+
+/* Kuchapisha: daima light (karatasi nyeupe) */
+@media print {
+  html[data-theme='dark'],
+  html[data-theme='dark'] .theme-chrome,
+  html[data-theme='dark'] .theme-chrome .theme-surface {
+    --color-ink-950: #0f1b30;
+    --color-ink-900: #152a4e;
+    --color-ink-800: #1c3760;
+    --color-ink-700: #2a4a7d;
+    --color-ink-600: #3d5f97;
+    --color-ink-500: #5b7bb3;
+    --color-ink-100: #e4e9f3;
+    --color-ink-50: #f1f4f9;
+    --color-gold-700: #9c6a1f;
+    --color-gold-600: #c98a2e;
+    --color-gold-500: #dba24b;
+    --color-gold-100: #f6e7cc;
+    --color-paper: #ffffff;
+    --color-paper-raised: #ffffff;
+    --color-standing-good: #2f6f4e;
+    --color-standing-good-bg: #e5f0e9;
+    --color-standing-warn: #b8792a;
+    --color-standing-warn-bg: #f6ead7;
+    --color-standing-overdue: #a13d2e;
+    --color-standing-overdue-bg: #f6e1dd;
+    --color-on-accent: #ffffff;
+    --color-on-gold: #0f1b30;
+    color-scheme: light;
+  }
+}

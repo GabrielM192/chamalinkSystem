@@ -1,0 +1,46 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChamaLink.Domain", "ChamaLink.Domain\ChamaLink.Domain.csproj", "{B83CFE7E-A230-46D8-A206-491A7943E187}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChamaLink.Application", "ChamaLink.Application\ChamaLink.Application.csproj", "{AD81FC3E-031E-472F-828B-256E83AC3F09}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChamaLink.Infrastructure", "ChamaLink.Infrastructure\ChamaLink.Infrastructure.csproj", "{D5AB7480-E0A1-42A8-BC29-6FAE1F048E21}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChamaLink.API", "ChamaLink.API\ChamaLink.API.csproj", "{C8AEC3B4-CA39-4935-BCF7-653D01D49529}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChamaLink.Tests", "ChamaLink.Tests\ChamaLink.Tests.csproj", "{2C20E0D7-B1B6-4AED-8C8D-B36DB3F2A934}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B83CFE7E-A230-46D8-A206-491A7943E187}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B83CFE7E-A230-46D8-A206-491A7943E187}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B83CFE7E-A230-46D8-A206-491A7943E187}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B83CFE7E-A230-46D8-A206-491A7943E187}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AD81FC3E-031E-472F-828B-256E83AC3F09}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AD81FC3E-031E-472F-828B-256E83AC3F09}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AD81FC3E-031E-472F-828B-256E83AC3F09}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AD81FC3E-031E-472F-828B-256E83AC3F09}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D5AB7480-E0A1-42A8-BC29-6FAE1F048E21}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D5AB7480-E0A1-42A8-BC29-6FAE1F048E21}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D5AB7480-E0A1-42A8-BC29-6FAE1F048E21}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D5AB7480-E0A1-42A8-BC29-6FAE1F048E21}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C8AEC3B4-CA39-4935-BCF7-653D01D49529}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C8AEC3B4-CA39-4935-BCF7-653D01D49529}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C8AEC3B4-CA39-4935-BCF7-653D01D49529}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C8AEC3B4-CA39-4935-BCF7-653D01D49529}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2C20E0D7-B1B6-4AED-8C8D-B36DB3F2A934}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2C20E0D7-B1B6-4AED-8C8D-B36DB3F2A934}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2C20E0D7-B1B6-4AED-8C8D-B36DB3F2A934}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2C20E0D7-B1B6-4AED-8C8D-B36DB3F2A934}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

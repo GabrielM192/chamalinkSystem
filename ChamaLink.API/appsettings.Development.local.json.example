@@ -1,0 +1,13 @@
+{
+  "//": "Faili hii HAIPO kwenye git (imezuiliwa na .gitignore). Hii ndiyo siri zako za ndani.",
+  "//2": "Ikiwa umepata repo hii kutoka GitHub, nakili appsettings.Development.json",
+  "//3": "kuwa appsettings.Development.local.json na uweke siri zako hapa.",
+
+  "Jwt": {
+    "Key": "REPLACE_ME-WEKA-KEY-YAKO-HAPA-openssl-rand-base64-64"
+  },
+
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Database=chamalink;Username=postgres;Password=sandbox123"
+  }
+}

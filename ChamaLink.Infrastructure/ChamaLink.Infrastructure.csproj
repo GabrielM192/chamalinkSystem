@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\ChamaLink.Application\ChamaLink.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
+    <!--
+      FIX (ukaguzi 2026-09-15, M-14): zamani project hii ilikuwa inarejelea
+      `Microsoft.Extensions.Hosting` **10.0.11** - yaani paketi ya .NET 10
+      ndani ya project ya **net8.0**. Ilikuwa inajenga, lakini ni mchanganyiko
+      usio sahihi: inavuta mnyororo mzima wa paketi za .NET 10 kwa ajili ya
+      kitu kimoja tu - `BackgroundService` (kwa background services tatu).
+
+      `Microsoft.Extensions.Hosting.Abstractions` ndiyo inayobeba
+      `BackgroundService`, na 8.0.11 inalingana na net8.0 na na paketi zote
+      nyingine za EF Core hapa. Ni ndogo zaidi na ni ya toleo sahihi.
+    -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.1" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.11">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.0.1" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,80 @@
+## ---------------------------------------------------------------
+## ChamaLink - .gitignore ya root (.NET + Node)
+## Hii ilikuwa haipo, na kwa sababu hiyo faili 246 za bin/obj
+## zilikuwa zimeingia kwenye git (.git ilikuwa 15 MB).
+## ---------------------------------------------------------------
+
+### .NET build output
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+artifacts/
+publish/
+*.binlog
+
+### .NET / MSBuild
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+*.pidb
+*.svclog
+*.scc
+project.lock.json
+project.fragment.lock.json
+*.nuget.props
+*.nuget.targets
+
+### Visual Studio / Rider / VS Code
+.vs/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+# launch.json/tasks.json zinaruhusiwa kwa makusudi: zinafanya F5 ifanye kazi
+# kwa watumiaji wote wa VS Code bila usanidi wa ziada. Hazina siri.
+!.vscode/launch.json
+!.vscode/tasks.json
+.idea/
+*.swp
+*.swo
+
+### Test results & coverage
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+coverage*.json
+coverage*.xml
+coverage*.info
+*.coverage
+*.coveragexml
+TestResults/
+
+### Node / frontend
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.eslintcache
+
+### Siri / environment  -- USIZIWEKE KWENYE GIT
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+*.pfx
+*.snk
+
+### OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+### EF Core bundles / scripts zilizozalishwa
+*.dacpac
+*.jfm
