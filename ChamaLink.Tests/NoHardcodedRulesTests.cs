@@ -77,9 +77,17 @@ public class NoHardcodedRulesTests
         "1024",               // ukubwa wa faili (bytes)
         "RequestSizeLimit",   // kikomo cha ukubwa wa upload
         "StringLength",       // urefu wa maandishi
+        "HasMaxLength",       // urefu wa safu ya database (EF)
         "year <",             // ukaguzi wa mwaka unaoeleweka (mf. year < 2000)
         "CompliancePercent",  // kikomo cha usalama cha asilimia
         "new Random()",       // kodi ya kikundi ya nasibu
+        "OtpModulus",         // SASISHO20: TOTP = tarakimu 6 (RFC 6238), si pesa
+        "DetailJsonMaxChars", // SASISHO20: kikomo cha urefu wa JSON ya kumbukumbu
+        "MaxAuditRows",       // SASISHO20: kikomo cha mistari ya kumbukumbu inayorudishwa
+        "MaxTopUpCredits",    // SASISHO21: idadi ya juu ya SMS kwa ongezeko moja (si pesa; salio la ujumbe)
+        "MaxLength(1500)",    // SASISHO21: urefu wa maelezo ya rufaa (herufi, si pesa)
+        "MaxLength(1000)",    // SASISHO21: urefu wa uamuzi wa rufaa (herufi, si pesa)
+        "Trim(note, 1000)",   // SASISHO21: kukata maelezo kwa urefu (herufi, si pesa)
     };
 
     [Fact]

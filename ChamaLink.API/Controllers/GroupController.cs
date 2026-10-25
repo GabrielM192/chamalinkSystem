@@ -1,4 +1,5 @@
 using ChamaLink.API.Extensions;
+using ChamaLink.API.Filters;
 using ChamaLink.Application.DTOs;
 using ChamaLink.Domain;
 using ChamaLink.Infrastructure.Services;
@@ -27,7 +28,9 @@ public class GroupController : ControllerBase
     // name a DIFFERENT user as its admin. The admin is now always the
     // authenticated caller - there is no longer a way to create a group
     // "on behalf of" someone else.
+    // SASISHO17 (NEW-1): njia ya zamani isiyo na namba rasmi/kodi ya kujiunga/ukaguzi — imefungwa.
     [HttpPost("create")]
+    [LegacyEndpoint("/api/membership/groups")]
     public async Task<IActionResult> CreateGroup([FromBody] CreateGroupDto dto)
     {
 
@@ -41,7 +44,9 @@ public class GroupController : ControllerBase
     // Admin"): anyone with a token could previously add a member to any
     // group by guessing/knowing its groupId. Now only that group's own
     // Chairperson can.
+    // SASISHO17 (NEW-1): iliruhusu kuongeza akaunti YOYOTE kwa NAFASI YOYOTE (hata kiongozi) bila kura — imefungwa.
     [HttpPost("{groupId}/add-member")]
+    [LegacyEndpoint("/api/membership/{groupId}/members  (rekodi ya Mwanachama)  +  /api/membership/{groupId}/role-requests  (cheo kwa kura)")]
     public async Task<IActionResult> AddMember(Guid groupId, [FromBody] AddMemberDto dto)
     {
 
@@ -67,6 +72,7 @@ public class GroupController : ControllerBase
     // change happens here, and members should be able to see their own
     // group's rules (contribution amount, grace period, etc).
     [HttpGet("{groupId}/settings")]
+    [LegacyEndpoint("/api/truth/{groupId}/settings")]
     public async Task<IActionResult> GetSettings(Guid groupId)
     {
 
@@ -82,7 +88,9 @@ public class GroupController : ControllerBase
     // group's contribution amount, fine, grace period, joining fee,
     // minimum reserve, or withdrawal approval rule. Only the Chairperson
     // may change settings now.
+    // SASISHO17 (P1-6): mipangilio inabadilishwa kwa pendekezo + idhini ya kiongozi wa pili (/api/truth/{groupId}/settings/proposals).
     [HttpPut("{groupId}/settings")]
+    [LegacyEndpoint("PUT /api/truth/{groupId}/settings (pendekezo) + /api/truth/{groupId}/settings/proposals/{id}/decide (kiongozi wa pili)")]
     public async Task<IActionResult> UpdateSettings(Guid groupId, [FromBody] UpdateGroupSettingsDto dto)
     {
 

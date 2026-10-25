@@ -36,6 +36,12 @@ public class AuditEvent
 
     public bool IsSystemGenerated { get; set; } = false;
     public Guid CorrelationId { get; set; } = Guid.NewGuid();
+
+    // ---- Mnyororo wa hash (SASISHO13): kila tukio "linafungwa" kwa hash ya lililotangulia ndani ya kikundi ----
+    /// <summary>Nafasi kwenye mnyororo wa kikundi (1, 2, 3...). Null = bado halijafungwa.</summary>
+    public long? ChainIndex { get; set; }
+    public string? PrevHash { get; set; }
+    public string? Hash { get; set; }
 }
 
 public enum AuditAction
@@ -73,5 +79,80 @@ public enum AuditAction
     MemberRoleChanged = 112,
     MemberNumberIssued = 113,
     MemberRecordCreated = 114,
-    JoinCodeChanged = 115
+    JoinCodeChanged = 115,
+    // Mafao na utawala wa watu wengi
+    BenefitCaseOpened = 120,
+    EvidenceUploaded = 121,
+    EvidenceVerified = 122,
+    EvidenceRejected = 123,
+    VoteCast = 124,
+    BenefitApproved = 125,
+    BenefitRejected = 126,
+    BenefitPaidConfirmed = 127,
+    EvidenceAccessed = 128,
+    BenefitCaseClosed = 129,
+    PhoneLinkApproved = 130,
+    PhoneLinkEnded = 131,
+    StatusChangeRequested = 132,
+    WithdrawalExplained = 133,
+    ResetBlocked = 134,
+    PaymentInitiated = 135,
+    RiskBlocked = 136,
+    RelationAdded = 137,
+    RelationEndRequested = 138,
+    RelationEnded = 139,
+    BenefitLedgerPosted = 140,
+    /// <summary>SASISHO14: kesi iliyosubiri pesa imekaguliwa upya (AwaitingFunds -> Approved).</summary>
+    BenefitFundsRechecked = 141,
+    // SASISHO15
+    RelationApproved = 142,
+    RelationRejected = 143,
+    LoanApplicationSubmitted = 144,
+    LoanApplicationApproved = 145,
+    LoanApplicationRejected = 146,
+    LoanApplicationCancelled = 147,
+    LoanDisbursementInitiated = 148,
+    LoanDisbursementConfirmed = 149,
+    LoanDefaultRequested = 150,
+    LoanDefaultDecided = 151,
+    LoanApplicationExpired = 152,
+    SessionsRevoked = 153,
+    // SASISHO17
+    RoleChangeRequested = 160,
+    RoleChangeApproved = 161,
+    RoleChangeRejected = 162,
+    RoleChangeCancelled = 163,
+    LeaderRoleRevokedByStatus = 164,
+    StatementImportStaged = 165,
+    StatementImportApproved = 166,
+    StatementImportRejected = 167,
+    StatementImportCancelled = 168,
+    ResetRequested = 169,
+    ResetApproved = 170,
+    StatusChangeApplied = 171,
+    // SASISHO20 — msimamizi wa mfumo (kikundi KINAONA kila kitendo kinachokigusa)
+    PlatformUnlockedAccount = 180,
+    PlatformResetCodeIssued = 181,
+    PlatformResetCodeRedeemed = 182,
+    PlatformJoinCodeRotated = 183,
+    PlatformNoticeSent = 184,
+    PlatformBreakGlassApproved = 185,
+    PlatformBreakGlassUsed = 186,
+    PlatformBreakGlassRevoked = 187,
+    // SASISHO21 — sanduku la malipo (kodi ya malipo + madai ya wanachama)
+    PaymentReceiptConfirmed = 190,
+    PaymentReceiptSecondApproved = 191,
+    PaymentReceiptRejected = 192,
+    PaymentClaimSubmitted = 193,
+    PaymentClaimDecided = 194,
+    PaymentAttributionCorrected = 195,
+    SmsQueued = 200,
+    SmsSent = 201,
+    SmsFailed = 202,
+    SmsSuppressed = 203,
+    // SASISHO21 — rufaa (kupinga uamuzi unaomgusa mwanachama)
+    AppealFiled = 210,
+    AppealVoted = 211,
+    AppealDecided = 212,
+    AppealWithdrawn = 213
 }

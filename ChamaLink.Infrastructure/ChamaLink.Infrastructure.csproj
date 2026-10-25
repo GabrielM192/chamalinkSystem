@@ -18,12 +18,16 @@
       nyingine za EF Core hapa. Ni ndogo zaidi na ni ya toleo sahihi.
     -->
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.1" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.11">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.31">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.0.1" />
+    <!-- SASISHO17.2: Npgsql 8.0.11 inavuta EF Relational 8.0.11, wakati EF Core/InMemory/Tools ni 8.0.31.
+         Kurejelea Relational moja kwa moja kunaoanisha mnyororo mzima (huondoa onyo la MSB3277 na hatari ya
+         tofauti ya tabia kati ya majaribio na uzalishaji). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.31" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.23.0" />
   </ItemGroup>
 
   <PropertyGroup>

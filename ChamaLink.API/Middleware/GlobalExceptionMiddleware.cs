@@ -32,13 +32,16 @@ public class GlobalExceptionMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<GlobalExceptionMiddleware> _logger;
-    private readonly IHostEnvironment _env;
+    private readonly bool _includeDetails;
 
-    public GlobalExceptionMiddleware(RequestDelegate next, ILogger<GlobalExceptionMiddleware> logger, IHostEnvironment env)
+    public GlobalExceptionMiddleware(RequestDelegate next, ILogger<GlobalExceptionMiddleware> logger, IHostEnvironment env, IConfiguration config)
     {
         _next = next;
         _logger = logger;
-        _env = env;
+        // SASISHO16: stack trace HAIENDI kwa mteja kamwe kwa chaguo-msingi — hata Development (mashine ya
+        // mtengenezaji mara nyingi ndiyo inayotumika kama server ya majaribio kwenye mtandao). Iwashwe kwa
+        // makusudi tu: Development + "Errors:IncludeExceptionDetails": true. Logi ya server ina kila kitu.
+        _includeDetails = env.IsDevelopment() && config.GetValue<bool>("Errors:IncludeExceptionDetails");
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -73,11 +76,18 @@ public class GlobalExceptionMiddleware
         // to the server-side structured log, tagged with the correlation
         // ID, the path, and the authenticated user if there is one -
         // never to the client.
-        _logger.LogError(ex,
-            "Unhandled exception. CorrelationId={CorrelationId} Path={Path} Method={Method} User={User} StatusCode={StatusCode}",
-            correlationId, context.Request.Path, context.Request.Method,
-            context.User?.Identity?.IsAuthenticated == true ? context.User.Identity!.Name : "anonymous",
-            statusCode);
+        // SASISHO16: kitambulisho cha mtumiaji (claim) — Identity.Name ilikuwa tupu (logi zilionyesha User=(null))
+        var who = context.User?.Identity?.IsAuthenticated == true
+            ? context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? context.User.FindFirst("sub")?.Value ?? "authenticated"
+            : "anonymous";
+        if (statusCode >= 500)
+            _logger.LogError(ex,
+                "Unhandled exception. CorrelationId={CorrelationId} Path={Path} Method={Method} User={User} StatusCode={StatusCode}",
+                correlationId, context.Request.Path, context.Request.Method, who, statusCode);
+        else // SASISHO15: makosa ya mteja (4xx) ni sehemu ya kawaida ya mtiririko — Warning bila stack trace (logi zisijae kelele)
+            _logger.LogWarning(
+                "Request rejected. CorrelationId={CorrelationId} Path={Path} Method={Method} User={User} StatusCode={StatusCode} Error={ErrorType}: {ErrorMessage}",
+                correlationId, context.Request.Path, context.Request.Method, who, statusCode, ex.GetType().Name, ex.Message);
 
         context.Response.ContentType = "application/problem+json";
         context.Response.StatusCode = statusCode;
@@ -96,16 +106,21 @@ public class GlobalExceptionMiddleware
             // frontend isivunjike. `detail` ndiyo ya kawaida; `message` ni
             // kwa ajili ya urithi wa code iliyopo.
             message = publicMessage,
+            // SASISHO14: kiolezo + vigeu -> frontend inatafsiri (EN haionyeshi Kiswahili)
+            template = ex is AppException ae1 && statusCode < 500 ? ae1.Template : null,
+            args = ex is AppException ae2 && statusCode < 500 ? ae2.Args : null,
+            details = ex is AppException ae3 && statusCode < 500 && ae3.Details.Count > 0 ? ae3.Details : null,
             correlationId,
             // Stack traces and raw exception messages are only ever
             // included outside the "detail" field, and only in
             // Development - never in a deployed/production environment.
-            debug = _env.IsDevelopment() ? ex.ToString() : null
+            debug = _includeDetails ? ex.ToString() : null
         };
 
         await context.Response.WriteAsync(JsonSerializer.Serialize(problem, new JsonSerializerOptions
         {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
         }));
     }
 
@@ -115,7 +130,20 @@ public class GlobalExceptionMiddleware
     // ex.Message for unrecognised exceptions, since that is exactly how
     // database connection strings, table/column names, and file paths
     // used to leak to clients via the old catch(Exception) pattern.
-    private static (int StatusCode, string Title, string Message) MapException(Exception ex) => ex switch
+    /// <summary>
+    /// SASISHO16: ujumbe wa exception za mfumo (ArgumentException, KeyNotFoundException, UnauthorizedAccessException)
+    /// unasambazwa TU kama ziliandikwa na code ya ChamaLink yenyewe (ujumbe wa makusudi kwa mtumiaji). Zikitoka
+    /// ndani ya .NET (Dictionary, Enum.Parse, Guid.Parse, ThrowHelper…) ujumbe wake una majina ya ndani
+    /// (aina za .NET, majina ya vigezo, funguo) — mteja anapata ujumbe wa jumla.
+    /// </summary>
+    internal static bool IsOwnMessage(Exception ex)
+    {
+        if (ex is ArgumentException { ParamName: not null }) return false; // "(Parameter 'x')" = maelezo ya ndani
+        var ns = ex.TargetSite?.DeclaringType?.Namespace;
+        return ns is not null && ns.StartsWith("ChamaLink", StringComparison.Ordinal);
+    }
+
+    internal static (int StatusCode, string Title, string Message) MapException(Exception ex) => ex switch
     {
         // FIX (ukaguzi 2026-09-15, H-4): hii ilikuwa 401. Kisemantiki
         // 401 = "sijui wewe ni nani", 403 = "nakujua, lakini huna ruhusa".
@@ -132,17 +160,28 @@ public class GlobalExceptionMiddleware
         UnauthorizedAccessException => (
             (int)HttpStatusCode.Forbidden,
             "Huna ruhusa",
-            ex.Message),
+            IsOwnMessage(ex) ? ex.Message : "Huna ruhusa ya kufanya hili."),
 
         KeyNotFoundException => (
             (int)HttpStatusCode.NotFound,
             "Haikupatikana",
-            ex.Message),
+            IsOwnMessage(ex) ? ex.Message : "Haikupatikana."),
+
+        // SASISHO16: mwili wa ombi mkubwa mno / mbovu (Kestrel) — si 500
+        Microsoft.AspNetCore.Http.BadHttpRequestException bad => (
+            bad.StatusCode is >= 400 and < 500 ? bad.StatusCode : (int)HttpStatusCode.BadRequest,
+            "Ombi halikubaliki",
+            bad.StatusCode == StatusCodes.Status413PayloadTooLarge ? "Faili au ombi ni kubwa mno." : "Ombi halikubaliki."),
 
         // NEW (ukaguzi 2026-09-15, M-7): makosa ya biashara sasa yana aina
         // maalum (ChamaLink.Domain.Exceptions) badala ya `throw new Exception`.
         // Hii ndiyo ramani yao. Kila mmoja unabeba ujumbe ulioandikwa kwa
         // makusudi kuonyeshwa kwa mtumiaji, kwa hiyo ni salama kuusambaza.
+        UnauthorizedException => (
+            (int)HttpStatusCode.Unauthorized,
+            "Kikao kimeisha",
+            ex.Message),
+
         ForbiddenException => (
             (int)HttpStatusCode.Forbidden,
             "Huna ruhusa",
@@ -174,7 +213,7 @@ public class GlobalExceptionMiddleware
         ArgumentException => (
             (int)HttpStatusCode.BadRequest,
             "Ombi halina ukamilifu",
-            ex.Message),
+            IsOwnMessage(ex) ? ex.Message : "Ombi halina ukamilifu: thamani mojawapo si sahihi."),
 
         // Injini ya Ukweli: kikundi hakijaweka mipangilio -> ujumbe wa kueleweka (si 500)
         PolicyNotConfiguredException => (

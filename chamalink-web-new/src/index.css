@@ -31,6 +31,12 @@
   --color-standing-overdue-bg: #f6e1dd;
 
   /* Tokens za kimaana (semantic) — thamani zake zinabadilika kwenye dark */
+  /* Nembo (SASISHO22): rangi hizi HAZIBADILIKI kwenye dark mode — brand si rangi ya msimu. */
+  --color-brand-tile: #1c3760;
+  --color-brand-tile-2: #0f1b30;
+  --color-brand-gold: #dba24b;
+  --color-brand-paper: #f1f4f9;
+
   --color-on-accent: #ffffff; /* maandishi juu ya rangi kali (standing-good/overdue) */
   --color-on-gold: #0f1b30; /* maandishi juu ya gold-500 */
   --color-overlay: rgb(15 27 48 / 0.4); /* kivuli nyuma ya dirisha/paneli */
@@ -48,6 +54,33 @@ body {
 .figure {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+}
+
+/* ======================================================================
+   USO WA UKURASA NA PANELI ZA CHROME (SASISHO22)
+   Kanuni: rangi moja tu ya msingi (bluu-giza ya ink) na karatasi. Hakuna mistari,
+   hakuna michoro ya nyuma. Ukurasa wa kuingia na kurasa za ndani zinatumia
+   gradient ile ile, kwa nguvu tofauti — ndiyo maana mfumo unaonekana kitu kimoja.
+   ====================================================================== */
+
+/* Karatasi tulivu: mwanga hafifu juu kushoto, unatulia chini. */
+.app-canvas {
+  background-color: var(--color-paper);
+  background-image: radial-gradient(120ch 55vh at 12% -18%, rgb(255 255 255 / 0.85), transparent 70%);
+}
+
+html[data-theme='dark'] .app-canvas {
+  background-image: radial-gradient(120ch 55vh at 12% -18%, rgb(61 95 151 / 0.18), transparent 70%);
+}
+
+/* Paneli ya chrome (kichwa cha mfumo, ukurasa wa kuingia, kodi ya kujiunga).
+   Gradient ya nembo: mwanga mweupe hafifu juu kushoto + mwanga wa dhahabu chini kulia. */
+.chrome-panel {
+  background-color: var(--color-brand-tile-2);
+  background-image:
+    radial-gradient(90ch 50vh at 10% -20%, rgb(255 255 255 / 0.10), transparent 62%),
+    radial-gradient(70ch 42vh at 95% 120%, rgb(219 162 75 / 0.13), transparent 60%),
+    linear-gradient(162deg, var(--color-brand-tile) 0%, #152a4e 48%, var(--color-brand-tile-2) 100%);
 }
 
 /* ======================================================================

@@ -76,6 +76,17 @@ public class Loan
     // in practice it is a one-way flag set exactly once per loan.
     public bool LatePenaltyCharged { get; set; } = false;
 
+    // SASISHO15 (AWAMU L): mkopo unazaliwa tu kutoka kwenye ombi lililoidhinishwa na kuthibitishwa kwa utoaji wa M-Koba.
+    public Guid? LoanApplicationId { get; set; }
+    /// <summary>Rejea ya utoaji wa M-Koba uliothibitisha pesa kutoka (null = rekodi ya zamani/ya kuigwa).</summary>
+    public string? DisbursementReference { get; set; }
+    // Kutangaza "umeshindikana" (write-off) ni uamuzi wa watu WAWILI: mmoja anaomba, mwingine anaamua.
+    public Guid? DefaultRequestedByUserId { get; set; }
+    public DateTime? DefaultRequestedAt { get; set; }
+    public string? DefaultReason { get; set; }
+    public Guid? DefaultDecidedByUserId { get; set; }
+    public DateTime? DefaultDecidedAt { get; set; }
+
     public Group? Group { get; set; }
 }
 

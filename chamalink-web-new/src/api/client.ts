@@ -1,35 +1,61 @@
-import axios, { type InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
+import { endSession, getAccessToken, setAccessToken } from './session';
 
-// BUG FIX: this was hardcoded to http://localhost:5000/api, but the
-// backend actually runs on port 5168 (see ChamaLink.API launchSettings).
-// Now reads from an environment variable so it works on any developer's
-// machine (or a real deployment) without editing source - see .env.example.
+// Anwani ya API inatoka kwenye environment (.env / VITE_API_BASE_URL) — hakuna anwani iliyoandikwa ndani ya code.
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5168/api';
 
-export const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-});
+// withCredentials: cookie ya refresh (HttpOnly, SameSite=Strict, Path=/api/auth) inatumwa kwenye /auth/* tu.
+export const apiClient = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
 
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+  const token = getAccessToken();
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-// If the backend ever rejects the token (expired, revoked), send the
-// person back to the login screen instead of the app silently failing
-// every request from then on.
+// Refresh moja tu kwa wakati (maombi mengi yakipata 401 pamoja, yote yanasubiri refresh ile ile).
+let refreshing: Promise<string | null> | null = null;
+
+export interface SessionPayload {
+  token: string;
+  userId: string;
+  fullName: string;
+  email: string;
+  expiresInSeconds?: number;
+}
+
+/** Omba access token mpya kwa cookie ya refresh. Inarudisha null kama hakuna kikao halali. */
+export function refreshSession(): Promise<SessionPayload | null> {
+  const run = axios
+    .post<SessionPayload>(`${API_BASE_URL}/auth/refresh`, null, { withCredentials: true })
+    .then((r) => {
+      setAccessToken(r.data.token);
+      return r.data;
+    })
+    .catch(() => {
+      setAccessToken(null);
+      return null;
+    });
+  refreshing = run.then((d) => d?.token ?? null).finally(() => {
+    refreshing = null;
+  });
+  return run;
+}
+
+const isAuthCall = (url?: string) => !!url && /\/auth\//i.test(url);
+
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+  async (error: AxiosError) => {
+    const original = error.config as (InternalAxiosRequestConfig & { _retried?: boolean }) | undefined;
+    if (error.response?.status === 401 && original && !original._retried && !isAuthCall(original.url)) {
+      original._retried = true;
+      const token = await (refreshing ?? refreshSession().then((d) => d?.token ?? null));
+      if (token) {
+        original.headers.Authorization = `Bearer ${token}`;
+        return apiClient(original);
       }
+      endSession();
     }
     return Promise.reject(error);
   }

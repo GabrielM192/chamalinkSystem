@@ -12,8 +12,17 @@ import { LangBoundary } from '../i18n';
 // rather than each page fetching and guessing its own. See
 // groups/GroupContext.tsx for why that matters.
 export function ProtectedRoute() {
-  const { user } = useAuth();
+  const { user, ready } = useAuth();
   const location = useLocation();
+
+  // Kikao kinarejeshwa kutoka cookie ya HttpOnly — subiri kabla ya kuamua kumpeleka mtu kwenye login
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-paper text-sm text-ink-600" role="status">
+        …
+      </div>
+    );
+  }
 
   if (!user) {
     // Rudi pale pale baada ya kuingia (mf. kiungo cha kujiunga /jiunge/KODI kilichotumwa WhatsApp)

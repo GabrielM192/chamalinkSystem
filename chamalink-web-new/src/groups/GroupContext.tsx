@@ -1,6 +1,4 @@
 import {
-  createContext,
-  useContext,
   useEffect,
   useState,
   useCallback,
@@ -8,6 +6,7 @@ import {
 } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { getMyGroups, type MyGroupSummary } from '../api/groups';
+import { GroupContext } from './groupContextCore';
 
 import { t } from '../i18n';
 // The single source of truth for "which group is the user looking at right
@@ -23,18 +22,6 @@ import { t } from '../i18n';
 // GroupProvider lives inside ProtectedRoute, so it mounts only while a user
 // is signed in and tears down on logout - no chance of one user's selected
 // group leaking into another's session.
-interface GroupContextValue {
-  groups: MyGroupSummary[];
-  activeGroupId: string | null;
-  activeGroup: MyGroupSummary | null;
-  setActiveGroupId: (id: string) => void;
-  loading: boolean;
-  error: string | null;
-  /** Pakia upya orodha (baada ya kuanzisha kikundi au ombi la kujiunga kuidhinishwa). */
-  reload: (selectGroupId?: string) => void;
-}
-
-const GroupContext = createContext<GroupContextValue | undefined>(undefined);
 
 // Per-user storage key: the selected group is remembered across reloads,
 // but scoped to the user so it can never be read by a different account.
@@ -56,8 +43,7 @@ export function GroupProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    // loading/error zinawekwa na reload() (si hapa) — kuepuka setState ndani ya effect.
 
     getMyGroups()
       .then((data) => {
@@ -87,6 +73,8 @@ export function GroupProvider({ children }: { children: ReactNode }) {
   }, [user, reloadKey, preferred]);
 
   const reload = useCallback((selectGroupId?: string) => {
+    setLoading(true);
+    setError(null);
     if (selectGroupId) setPreferred(selectGroupId);
     setReloadKey((k) => k + 1);
   }, []);
@@ -110,10 +98,3 @@ export function GroupProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useGroupContext(): GroupContextValue {
-  const context = useContext(GroupContext);
-  if (!context) {
-    throw new Error('useGroupContext must be used within a GroupProvider');
-  }
-  return context;
-}

@@ -31,9 +31,33 @@ public partial class TruthLedgerService
     public async Task<TruthGroupSettings> GetSettingsAsync(Guid groupId, CancellationToken ct = default)
         => await _context.TruthGroupSettings.AsNoTracking().FirstOrDefaultAsync(s => s.GroupId == groupId, ct)
            ?? throw new PolicyNotConfiguredException(groupId,
-               $"Kikundi {groupId} hakijaweka mipangilio ya Injini ya Ukweli. Viongozi waweke kupitia PUT /api/truth/{groupId}/settings.");
+               // SASISHO17: jibu kwa mtumiaji halitaji GUID wala njia za API (hakuna ramani ya ndani kwa mshambuliaji)
+               "Kikundi hakijaweka mipangilio ya fedha. Viongozi waweke kanuni kwanza.");
 
-    public sealed record MemberTruth(Guid MemberId, string MemberNumber, IReadOnlyList<string> Phones, TruthStatement Statement, List<string> Warnings);
+    /// <summary>
+    /// SASISHO16: taarifa ya Injini ya Ukweli kuhusu mwanachama — msimbo thabiti + ujumbe unaotafsirika (Tpl/Args),
+    /// kwa lugha ya biashara (si majina ya safu za DB). Kind: "notice" (mwanachama mwenyewe anaweza kuona) au
+    /// "dataQuality" (ubora wa data — viongozi/wakaguzi tu).
+    /// </summary>
+    public sealed record TruthNotice(string Code, string Kind, string Message, string Tpl, string[] Args)
+    {
+        public const string KindNotice = "notice";
+        public const string KindDataQuality = "dataQuality";
+        public static TruthNotice Of(string code, string kind, ChamaLink.Domain.Localization.Loc l) => new(code, kind, l.Text, l.Template, l.Args.ToArray());
+    }
+
+    public sealed record MemberTruth(Guid MemberId, string MemberNumber, IReadOnlyList<string> Phones, TruthStatement Statement, List<string> Warnings)
+    {
+        /// <summary>Tarehe halisi ya kujiunga (ya mapema kati ya JoinedAt na malipo ya kwanza yaliyothibitishwa), EAT.</summary>
+        public DateTime EffectiveJoin { get; init; }
+        /// <summary>Tarehe ambayo majukumu yalikoma (kujitoa/kifo/kufukuzwa kulikoidhinishwa). Null = bado ni mwanachama.</summary>
+        public DateTime? ObligationsEndAt { get; init; }
+        /// <summary>SASISHO16: taarifa zenye msimbo (Warnings = maandishi yake ya Kiswahili, kwa urithi).</summary>
+        public List<TruthNotice> Notices { get; init; } = new();
+    }
+
+    /// <summary>Hali ambazo mwanachama hana majukumu mapya (baada ya tarehe ya mabadiliko).</summary>
+    public static readonly MemberStatus[] TerminalStatuses = { MemberStatus.Exited, MemberStatus.Deceased, MemberStatus.Archived };
 
     public sealed record UnattributedReport(
         List<MkobaRawTransaction> DepositsWithUnknownPhone,
@@ -52,7 +76,9 @@ public partial class TruthLedgerService
         var asOf = Unspecified(asOfEat ?? NowEat());
         var dbPolicy = await GetSettingsAsync(member.GroupId, ct);
         var raw = await LoadRawAsync(member.GroupId, new[] { member.Id }, ct);
-        return Compute(member, raw, dbPolicy, ToTruthPolicy(dbPolicy), asOf, hypotheticalPayments);
+        // SASISHO18: kikundi cha "kila tukio" hakina vipindi vya mwezi.
+        var eventBased = await IsEventBasedAsync(member.GroupId, ct);
+        return Compute(member, raw, dbPolicy, ToTruthPolicy(dbPolicy, eventBased), asOf, hypotheticalPayments);
     }
 
     /// <summary>
@@ -70,31 +96,44 @@ public partial class TruthLedgerService
 
         var asOf = Unspecified(asOfEat ?? NowEat());
         var dbPolicy = await GetSettingsAsync(groupId, ct);
-        var policy = ToTruthPolicy(dbPolicy);
+        var policy = ToTruthPolicy(dbPolicy, await IsEventBasedAsync(groupId, ct));
         var raw = await LoadRawAsync(groupId, members.Select(m => m.Id).ToList(), ct);
         return members.Select(m => Compute(m, raw, dbPolicy, policy, asOf, null)).ToList();
     }
 
     /// <summary>Data ghafi ya wanachama waliotajwa (mmoja au wote) — hakuna hesabu hapa.</summary>
     private sealed record RawData(
-        ILookup<Guid, string> PhonesByMember,
+        ILookup<Guid, MemberPhone> PhonesByMember,
         ILookup<string, MkobaRawTransaction> DepositsByPhone,
+        /// <summary>SASISHO21: amana zilizothibitishwa kuwa za mwanachama (hata kama namba si yake).</summary>
+        ILookup<Guid, MkobaRawTransaction> DepositsByOwner,
+        ILookup<Guid, BenefitOffset> BenefitOffsetsByMember,
+        Dictionary<Guid, DateTime> ObligationsEnd,
         ILookup<Guid, MkobaStatementGap> GapsByMember,
         ILookup<Guid, FinancialEvent> ManualByMember,
         ILookup<Guid, Loan> LoansByMember,
         List<TruthAdjustmentRecord> Adjustments);
 
+    /// <summary>Makato ya kesi moja ya mafao kama yalivyoandikwa kwenye daftari lisilobadilika (BenefitLedgerEntries).</summary>
+    private sealed record BenefitOffset(Guid MemberId, string CaseNumber, DateTime At, decimal JoinFee, decimal Arrears, decimal LoanArrears, bool LegacyArrears);
+
     private async Task<RawData> LoadRawAsync(Guid groupId, IReadOnlyCollection<Guid> memberIds, CancellationToken ct)
     {
+        // Namba zilizoidhinishwa na kiongozi wa pili TU (Pending/Rejected hazihesabiwi); muda wa umiliki unaheshimiwa
         var phoneRows = await _context.MemberPhones.AsNoTracking()
-            .Where(p => memberIds.Contains(p.GroupMemberId))
-            .Select(p => new { p.GroupMemberId, p.Phone }).ToListAsync(ct);
+            .Where(p => memberIds.Contains(p.GroupMemberId) && p.Status == TruthApprovalStatus.Approved)
+            .ToListAsync(ct);
         var allPhones = phoneRows.Select(p => p.Phone).Distinct().ToList();
 
-        // 1. M-Koba deposits kwa namba ya simu
+        // 1. M-Koba deposits. SASISHO21: mstari wenye MMILIKI aliyethibitishwa
+        // (AttributedGroupMemberId) unamilikiwa na mtu HUYO tu — hauna kuhesabiwa kwa namba pia.
         var deposits = await _context.MkobaRawTransactions.AsNoTracking()
-            .Where(t => t.GroupId == groupId && !t.IsWithdrawal && allPhones.Contains(t.Phone))
+            .Where(t => t.GroupId == groupId && !t.IsWithdrawal
+                        && ((t.AttributedGroupMemberId == null && allPhones.Contains(t.Phone))
+                            || (t.AttributedGroupMemberId != null && memberIds.Contains(t.AttributedGroupMemberId.Value))))
             .ToListAsync(ct);
+        var byPhone = deposits.Where(d => d.AttributedGroupMemberId == null).ToList();
+        var byOwner = deposits.Where(d => d.AttributedGroupMemberId != null).ToList();
 
         // 2. Mapengo yaliyothibitishwa
         var gaps = await _context.MkobaStatementGaps.AsNoTracking()
@@ -118,9 +157,53 @@ public partial class TruthLedgerService
             .Where(a => a.GroupId == groupId && (a.GroupMemberId == null || memberIds.Contains(a.GroupMemberId.Value)))
             .ToListAsync(ct);
 
+        // 6. Makato ya mafao (Kianzio/deni lililokatwa kwenye msiba/sherehe) — kesi zilizolipwa na kuthibitishwa
+        // SASISHO15 (P1): chanzo ni DAFTARI LA MAFAO (BenefitLedgerEntries — linaandikwa mara moja kesi inapolipwa, halibadiliki),
+        // si safu za BenefitCase zinazoweza kuhaririwa. Kesi ya zamani iliyolipwa bila daftari (kabla ya SASISHO13) inasomwa kutoka kesi.
+        var paidCases = await _context.BenefitCases.AsNoTracking()
+            .Where(c => c.GroupId == groupId && c.Status == BenefitCaseStatus.Paid && memberIds.Contains(c.BeneficiaryGroupMemberId))
+            .Select(c => new { c.Id, c.BeneficiaryGroupMemberId, c.CaseNumber, c.PaidAt, c.ApprovedAt, c.CreatedAt, c.JoinFeeDeducted, c.ArrearsDeducted, c.LoanArrearsDeducted })
+            .ToListAsync(ct);
+        var caseIds = paidCases.Select(c => c.Id).ToList();
+        var ledger = (await _context.BenefitLedgerEntries.AsNoTracking()
+                .Where(e => caseIds.Contains(e.BenefitCaseId)).Select(e => new { e.BenefitCaseId, e.Kind, e.Amount }).ToListAsync(ct))
+            .ToLookup(e => e.BenefitCaseId);
+        var offsets = new List<BenefitOffset>();
+        foreach (var c in paidCases)
+        {
+            var at = c.PaidAt ?? c.ApprovedAt ?? c.CreatedAt;
+            var rows = ledger[c.Id].ToList();
+            var o = rows.Count > 0
+                ? new BenefitOffset(c.BeneficiaryGroupMemberId, c.CaseNumber, at,
+                    rows.Where(r => r.Kind == BenefitLedgerKind.JoinFeeOffset).Sum(r => r.Amount),
+                    rows.Where(r => r.Kind == BenefitLedgerKind.ArrearsOffset).Sum(r => r.Amount),
+                    rows.Where(r => r.Kind == BenefitLedgerKind.LoanArrearsOffset).Sum(r => r.Amount),
+                    c.LoanArrearsDeducted is null)
+                : new BenefitOffset(c.BeneficiaryGroupMemberId, c.CaseNumber, at, c.JoinFeeDeducted, c.ArrearsDeducted, c.LoanArrearsDeducted ?? 0m, c.LoanArrearsDeducted is null);
+            if (o.JoinFee > 0 || o.Arrears > 0 || o.LoanArrears > 0) offsets.Add(o);
+        }
+
+        // 7. Kujitoa/kifo/kufukuzwa kulikoidhinishwa: tarehe ya mwisho ya majukumu
+        var terminalMembers = await _context.GroupMembers.AsNoTracking()
+            .Where(m => memberIds.Contains(m.Id) && TerminalStatuses.Contains(m.Status)).Select(m => new { m.Id, m.Status }).ToListAsync(ct);
+        var ends = new Dictionary<Guid, DateTime>();
+        if (terminalMembers.Count > 0)
+        {
+            var ids = terminalMembers.Select(t => t.Id).ToList();
+            var hist = await _context.MemberStatusHistories.AsNoTracking().Where(h => ids.Contains(h.MemberId)).ToListAsync(ct);
+            foreach (var t in terminalMembers)
+            {
+                var h = hist.Where(x => x.MemberId == t.Id && x.ToStatus == t.Status).OrderByDescending(x => x.ChangedAt).FirstOrDefault();
+                if (h is not null) ends[t.Id] = Unspecified(h.EffectiveFrom);
+            }
+        }
+
         return new RawData(
-            phoneRows.ToLookup(p => p.GroupMemberId, p => p.Phone),
-            deposits.ToLookup(d => d.Phone),
+            phoneRows.ToLookup(p => p.GroupMemberId),
+            byPhone.ToLookup(d => d.Phone),
+            byOwner.ToLookup(d => d.AttributedGroupMemberId!.Value),
+            offsets.ToLookup(c => c.MemberId),
+            ends,
             gaps.ToLookup(g => g.AssignedGroupMemberId!.Value),
             manual.ToLookup(e => e.MemberId!.Value),
             loans.ToLookup(l => l.GroupMemberId),
@@ -131,15 +214,43 @@ public partial class TruthLedgerService
     private static MemberTruth Compute(GroupMember member, RawData raw, TruthGroupSettings dbPolicy, TruthPolicy policy,
         DateTime asOf, IReadOnlyList<TruthPayment>? hypotheticalPayments)
     {
-        var phones = raw.PhonesByMember[member.Id].ToList();
-        var warnings = new List<string>();
+        var links = raw.PhonesByMember[member.Id].ToList();
+        var phones = links.Select(l => l.Phone).Distinct().ToList();
+        var notices = new List<TruthNotice>();
         if (phones.Count == 0)
-            warnings.Add("Mwanachama hana namba ya simu iliyowekwa — malipo yake ya M-Koba hayawezi kuonekana. Kiongozi aweke namba.");
+            notices.Add(TruthNotice.Of("NO_APPROVED_PHONE", TruthNotice.KindDataQuality,
+                $"Mwanachama hana namba ya simu iliyoidhinishwa, kwa hiyo malipo yake ya M-Koba hayawezi kuonekana. Kiongozi aweke namba, na kiongozi wa pili aidhinishe."));
 
         var payments = new List<TruthPayment>();
 
-        payments.AddRange(phones.Distinct().SelectMany(ph => raw.DepositsByPhone[ph])
+        // Muamala unahesabiwa kwa mwanachama huyu tu kama kiungo chake kinafunika SAA ya muamala (ValidFrom..ValidTo)
+        payments.AddRange(phones.SelectMany(ph => raw.DepositsByPhone[ph])
+            .Where(d => links.Any(l => l.Phone == d.Phone && l.Covers(Unspecified(d.Timestamp))))
+            .DistinctBy(d => d.Reference)
             .Select(d => new TruthPayment(d.Reference, Unspecified(d.Timestamp), d.Amount, PaymentSource.Mkoba)));
+
+        // SASISHO21: amana zilizothibitishwa kwenye sanduku la malipo (kodi ya malipo / uamuzi wa viongozi).
+        payments.AddRange(raw.DepositsByOwner[member.Id]
+            .DistinctBy(d => d.Reference)
+            .Select(d => new TruthPayment(d.Reference, Unspecified(d.Timestamp), d.Amount, PaymentSource.Mkoba)));
+
+        // Makato ya mafao: Kianzio kilichokatwa = Kianzio kimelipwa; deni lililokatwa = malipo (waterfall kamili)
+        foreach (var c in raw.BenefitOffsetsByMember[member.Id])
+        {
+            var at = Unspecified(c.At);
+            if (c.JoinFee > 0)
+                payments.Add(new TruthPayment($"MAFAO-JF-{c.CaseNumber}", at, c.JoinFee, PaymentSource.WelfareOffset,
+                    PaymentPurpose.JoinFee, IsApproved: true, Note: $"Kianzio kimekatwa kwenye mafao {c.CaseNumber}"));
+            // SASISHO14: LoanArrearsDeducted == null => kesi ya zamani (deni lilijumuisha mkopo -> Auto).
+            // Kesi mpya: deni la michango -> Contributions (mchango/faini tu); deni la mkopo -> rejea yake (Auto: mkopo kwanza).
+            if (c.Arrears > 0)
+                payments.Add(new TruthPayment($"MAFAO-DENI-{c.CaseNumber}", at, c.Arrears, PaymentSource.WelfareOffset,
+                    c.LegacyArrears ? PaymentPurpose.Auto : PaymentPurpose.Contributions, IsApproved: true,
+                    Note: $"Deni la michango limekatwa kwenye mafao {c.CaseNumber}"));
+            if (c.LoanArrears > 0)
+                payments.Add(new TruthPayment($"MAFAO-MKOPO-{c.CaseNumber}", at, c.LoanArrears, PaymentSource.WelfareOffset,
+                    PaymentPurpose.Auto, IsApproved: true, Note: $"Deni la mkopo limekatwa kwenye mafao {c.CaseNumber}"));
+        }
 
         payments.AddRange(raw.GapsByMember[member.Id].Where(g => g.ResolutionStatus != TruthApprovalStatus.Rejected).Select(g => new TruthPayment(
             $"GAP-{g.BeforeReference}", Unspecified(g.AssumedTimestamp ?? g.WindowEnd), g.Amount, PaymentSource.MkobaGapResolved,
@@ -168,19 +279,32 @@ public partial class TruthLedgerService
             .Select(p => (DateTime?)p.Timestamp).Min();
         var effectiveJoin = firstProof is { } fp && fp < joinedEat ? fp : joinedEat;
         if (firstProof is { } f0 && f0 < joinedEat.AddDays(-1))
-            warnings.Add($"JoinedAt ya DB ({joinedEat:yyyy-MM-dd}) ni baada ya malipo ya kwanza ({f0:yyyy-MM-dd}) — tarehe ya malipo ya kwanza imetumika.");
+            notices.Add(TruthNotice.Of("MEMBERSHIP_START_ADJUSTED", TruthNotice.KindDataQuality,
+                $"Tarehe ya kuanza uanachama imechukuliwa kutoka malipo ya kwanza yaliyothibitishwa ({f0:dd/MM/yyyy}), kwa sababu tarehe iliyosajiliwa ({joinedEat:dd/MM/yyyy}) ni ya baadaye."));
 
-        var statement = ContributionTruthEngine.Replay(ToTruthMember(member, effectiveJoin, dbPolicy, policy), payments, policy, asOf, truthLoans, truthAdj);
-        return new MemberTruth(member.Id, member.MemberNumber, phones, statement, warnings);
+        DateTime? endAt = raw.ObligationsEnd.TryGetValue(member.Id, out var e0) ? e0 : null;
+        if (endAt is { } ea)
+            notices.Add(TruthNotice.Of("OBLIGATIONS_ENDED", TruthNotice.KindNotice,
+                $"Hali ya uanachama: {Benefits.MemberStatusService.StatusName(member.Status)} kuanzia {ea:dd/MM/yyyy}. Hakuna michango mipya baada ya tarehe hiyo; madeni ya kabla yanabaki."));
+        var statement = ContributionTruthEngine.Replay(ToTruthMember(member, effectiveJoin, dbPolicy, policy, endAt), payments, policy, asOf, truthLoans, truthAdj);
+        return new MemberTruth(member.Id, member.MemberNumber, phones, statement, notices.Select(n => n.Message).ToList())
+            { EffectiveJoin = effectiveJoin, ObligationsEndAt = endAt, Notices = notices };
     }
 
     /// <summary>Pesa iliyoingia M-Koba lakini haijulikani ni ya nani (namba haijawekwa / pengo la PDF).</summary>
     public async Task<UnattributedReport> GetUnattributedAsync(Guid groupId, CancellationToken ct = default)
     {
-        var known = _context.MemberPhones.Where(p => p.GroupId == groupId).Select(p => p.Phone);
-        var unknown = await _context.MkobaRawTransactions
-            .Where(t => t.GroupId == groupId && !t.IsWithdrawal && !known.Contains(t.Phone))
-            .OrderBy(t => t.Timestamp).ToListAsync(ct);
+        // Muamala "haujulikani" kama HAKUNA kiungo kilichoidhinishwa kinachofunika saa yake (namba haijawekwa,
+        // bado inasubiri idhini, au ilifungwa kabla ya muamala huu).
+        var links = await _context.MemberPhones.AsNoTracking()
+            .Where(p => p.GroupId == groupId && p.Status == TruthApprovalStatus.Approved).ToListAsync(ct);
+        var linkedPhones = links.Select(l => l.Phone).ToHashSet();
+        var unknown = (await _context.MkobaRawTransactions.AsNoTracking()
+                .Where(t => t.GroupId == groupId && !t.IsWithdrawal)
+                .OrderBy(t => t.Timestamp).ToListAsync(ct))
+            .Where(t => t.AttributedGroupMemberId == null
+                        && (!linkedPhones.Contains(t.Phone) || !links.Any(l => l.Phone == t.Phone && l.Covers(Unspecified(t.Timestamp)))))
+            .ToList();
         var gaps = await _context.MkobaStatementGaps
             .Where(g => g.GroupId == groupId && g.ResolutionStatus != TruthApprovalStatus.Approved)
             .OrderBy(g => g.WindowStart).ToListAsync(ct);
@@ -242,14 +366,14 @@ public partial class TruthLedgerService
         var wRows = rows.Where(r => r.IsWithdrawal).ToList();
         var wPhones = wRows.Select(r => r.Phone).Distinct().ToList();
         var owners = await _context.MemberPhones.AsNoTracking()
-            .Where(p => p.GroupId == groupId && wPhones.Contains(p.Phone))
-            .Join(_context.GroupMembers, p => p.GroupMemberId, m => m.Id, (p, m) => new { p.Phone, m.Id, Name = m.User != null ? m.User.FullName : m.MemberNumber })
+            .Where(p => p.GroupId == groupId && wPhones.Contains(p.Phone) && p.Status == TruthApprovalStatus.Approved)
+            .Join(_context.GroupMembers, p => p.GroupMemberId, m => m.Id, (p, m) => new { p.Phone, m.Id, Name = m.User != null ? m.User.FullName : m.MemberNumber, Link = p })
             .ToListAsync(ct);
         var list = wRows
             .OrderByDescending(r => r.Timestamp)
             .Select(r =>
             {
-                var o = owners.FirstOrDefault(x => x.Phone == r.Phone);
+                var o = owners.FirstOrDefault(x => x.Phone == r.Phone && x.Link.Covers(Unspecified(r.Timestamp)));
                 return new CashWithdrawal(r.Reference, r.Timestamp, r.Amount, r.Phone, r.PayerName, r.Description,
                     o?.Id, o?.Name, r.Balance);
             })
@@ -260,15 +384,28 @@ public partial class TruthLedgerService
 
     // ------------------------------------------------------------------
 
-    public static TruthPolicy ToTruthPolicy(TruthGroupSettings p)
+    /// <summary>SASISHO18: kikundi hiki ni cha "kila tukio"? (hakuna mchango wa mwezi)</summary>
+    private async Task<bool> IsEventBasedAsync(Guid groupId, CancellationToken ct)
+        => await _context.Groups.AsNoTracking()
+               .Where(g => g.Id == groupId)
+               .Select(g => g.Type == GroupType.EventBased)
+               .FirstOrDefaultAsync(ct);
+
+    public static TruthPolicy ToTruthPolicy(TruthGroupSettings p, bool isEventBased = false)
     {
         var start = p.ContributionStartDate;
         return new TruthPolicy
         {
+            IsEventBased = isEventBased,
             MonthlyContribution = p.MonthlyContribution,
             LateFine = p.LateFine,
-            JoiningFee = p.JoiningFee,
-            DueDay = p.DueDateDay,
+            LateFinePercent = p.LateFinePercent,
+            // SASISHO21: sehemu ya ada ya kujiunga iliyo AKIBA ya mwanachama haitozwi kama kianzio.
+            // Mf. J3: 30,000 = 20,000 akiba + 10,000 kianzio -> injini inatoza 10,000 pekee.
+            // Sera ya kikundi ndiyo inaamua; 0 (chaguo-msingi) = tabia ya zamani kabisa.
+            JoiningFee = Math.Max(0m, p.JoiningFee - Math.Max(0m, p.JoiningSavingsPortion)),
+            // SASISHO21: kikundi cha "kila tukio" hakina tarehe ya mwezi; 0 si kosa — tunatumia 1 kama nafasi.
+            DueDay = p.DueDateDay is >= 1 and <= 28 ? p.DueDateDay : 1,
             GracePeriodDays = p.GracePeriodDays,
             FineOnPartialPayment = p.FineOnPartialPayment,
             GroupFirstPeriod = new YearMonth(start.Year, start.Month),
@@ -278,7 +415,7 @@ public partial class TruthLedgerService
         };
     }
 
-    private static TruthMember ToTruthMember(GroupMember m, DateTime effectiveJoin, TruthGroupSettings dbPolicy, TruthPolicy policy)
+    private static TruthMember ToTruthMember(GroupMember m, DateTime effectiveJoin, TruthGroupSettings dbPolicy, TruthPolicy policy, DateTime? obligationsEndAt)
     {
         bool founder = dbPolicy.FoundingMembersCutoff is null || effectiveJoin <= Unspecified(dbPolicy.FoundingMembersCutoff.Value);
         return new TruthMember
@@ -286,7 +423,8 @@ public partial class TruthLedgerService
             MemberId = m.Id.ToString(),
             Name = m.User?.FullName ?? m.MemberNumber,
             FirstPeriod = founder ? policy.GroupFirstPeriod : YearMonth.Of(effectiveJoin),
-            JoinFeeRequiredUpfront = !founder
+            JoinFeeRequiredUpfront = !founder,
+            ObligationsEndAt = obligationsEndAt
         };
     }
 

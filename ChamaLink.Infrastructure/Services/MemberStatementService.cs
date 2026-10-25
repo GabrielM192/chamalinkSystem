@@ -51,7 +51,7 @@ public class MemberStatementService
             .Where(l => l.GroupId == groupId && l.CreatedAt >= monthStart && l.CreatedAt < monthEnd)
             .Select(l => new { l.UserId, l.Type, l.Amount, l.ReferenceNo }).ToListAsync();
 
-        var entriesByUser = entries.GroupBy(e => e.UserId).ToDictionary(g => g.Key, g => g.ToList());
+        var entriesByUser = entries.Where(e => e.UserId.HasValue).GroupBy(e => e.UserId!.Value).ToDictionary(g => g.Key, g => g.ToList());   // UserId null (mwanachama bila akaunti) = isiangushe ripoti
 
         var loans = await _context.Loans.Where(l => l.GroupId == groupId).ToListAsync();
         var loansByMember = loans.GroupBy(l => l.GroupMemberId).ToDictionary(g => g.Key, g => g.ToList());

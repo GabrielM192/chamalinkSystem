@@ -1,3 +1,5 @@
+using ChamaLink.Domain.Localization;
+
 namespace ChamaLink.Domain.Exceptions;
 
 /// <summary>
@@ -22,8 +24,16 @@ namespace ChamaLink.Domain.Exceptions;
 /// </summary>
 public abstract class AppException : Exception
 {
-    protected AppException(string message) : base(message) { }
-    protected AppException(string message, Exception inner) : base(message, inner) { }
+    protected AppException(string message) : base(message) { Template = message; }
+    protected AppException(string message, Exception inner) : base(message, inner) { Template = message; }
+    /// <summary>SASISHO14: ujumbe unaotafsirika — Template (Kiswahili chenye {0}) + Args; frontend inatafsiri.</summary>
+    protected AppException(Loc message) : base(message.Text) { Template = message.Template; Args = message.Args.ToArray(); }
+
+    /// <summary>Kiolezo cha ujumbe (ufunguo wa tafsiri). Kwa ujumbe usio na vigeu = Message.</summary>
+    public string Template { get; }
+    public string[] Args { get; } = Array.Empty<string>();
+    /// <summary>Maelezo ya ziada yanayotafsirika (mf. orodha ya ukaguzi uliofeli).</summary>
+    public IReadOnlyList<LocMessage> Details { get; init; } = Array.Empty<LocMessage>();
 }
 
 /// <summary>
@@ -33,6 +43,7 @@ public abstract class AppException : Exception
 public class ValidationException : AppException
 {
     public ValidationException(string message) : base(message) { }
+    public ValidationException(Loc message) : base(message) { }
 }
 
 /// <summary>
@@ -42,6 +53,16 @@ public class ValidationException : AppException
 public class NotFoundException : AppException
 {
     public NotFoundException(string message) : base(message) { }
+    public NotFoundException(Loc message) : base(message) { }
+}
+
+/// <summary>
+/// Hakuna kikao halali (refresh token haipo/imekwisha/imefutwa) -> HTTP 401. Frontend inampeleka mtumiaji kwenye login.
+/// </summary>
+public class UnauthorizedException : AppException
+{
+    public UnauthorizedException(string message) : base(message) { }
+    public UnauthorizedException(Loc message) : base(message) { }
 }
 
 /// <summary>
@@ -52,6 +73,7 @@ public class NotFoundException : AppException
 public class ForbiddenException : AppException
 {
     public ForbiddenException(string message) : base(message) { }
+    public ForbiddenException(Loc message) : base(message) { }
 }
 
 /// <summary>
@@ -61,4 +83,5 @@ public class ForbiddenException : AppException
 public class ConflictException : AppException
 {
     public ConflictException(string message) : base(message) { }
+    public ConflictException(Loc message) : base(message) { }
 }

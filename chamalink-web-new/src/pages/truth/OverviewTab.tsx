@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { csvCell } from '../../lib/csv';
 import { AlertTriangle, ArrowDownUp, Download, Search, Users } from 'lucide-react';
 import { getGroupTruth, type MemberTruth } from '../../api/truth';
 import { useApi } from '../../lib/useApi';
@@ -275,7 +276,7 @@ function MonthDots({ m }: { m: MemberTruth }) {
 function downloadCsv(rows: MemberTruth[], asOf: string | null) {
   const months = rows[0]?.monthlyStatement.filter((x) => x.status !== 'NotYetOpen').map((x) => x.month) ?? [];
   const head = [t('Jina'), t('Namba'), t('Simu'), ...months.map((m) => monthLabel(m)), t('Deni'), t('Kianzio kilicholipwa'), t('Kianzio kinadaiwa'), t('Akiba'), t('Jumla ya deni')];
-  const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+  const esc = csvCell; // SASISHO16: salama dhidi ya fomula
   const lines = rows.map((m) => {
     const cells = months.map((mo) => m.monthlyStatement.find((x) => x.month === mo)?.excelCell ?? '');
     return [m.fullName, m.memberNumber, m.phones.join(' '), ...cells, m.totals.arrears, m.totals.joinFeePaid, m.totals.joinFeeOutstanding, m.totals.savings, m.totals.totalDebtIncludingJoinFee]

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Check, Copy, KeyRound, PlusCircle, Clock3, XCircle, ArrowRight } from 'lucide-react';
+import { Check, Copy, KeyRound, PlusCircle, Clock3, XCircle, ArrowRight, Banknote } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useMyGroups } from '../../hooks/useMyGroups';
 import { apiErrorMessage } from '../../api/truth';
@@ -22,7 +22,7 @@ import { Button, Card, Field, Input, Notice, Segmented, Textarea } from '../../c
 import { useApi } from '../../lib/useApi';
 import { useToast } from '../../lib/toast';
 import { groupRoleLabel } from '../../lib/status';
-import { wallDate } from '../../lib/truth';
+import { num, wallDate } from '../../lib/truth';
 
 import { t } from '../../i18n';
 type Mode = 'join' | 'create';
@@ -39,8 +39,11 @@ export function WelcomePage() {
   const [mode, setMode] = useState<Mode>('join');
   const [version, setVersion] = useState(0);
   const mine = useApi(() => getMyRequests(), user?.userId, [version]);
-  const pending = (mine.data ?? []).filter((r) => r.status === 'Pending');
-  const decided = (mine.data ?? []).filter((r) => r.status === 'Rejected').slice(0, 3);
+  // SASISHO21: ombi lenye lango la malipo linaonekana hapa hadi lilipwe.
+  const pending = (mine.data ?? []).filter((r) =>
+    r.status === 'Pending' || r.status === 'AwaitingPayment' || r.status === 'Paid',
+  );
+  const decided = (mine.data ?? []).filter((r) => r.status === 'Rejected' || r.status === 'Expired').slice(0, 3);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -91,22 +94,66 @@ function PendingList({ items, onChanged }: { items: MyRequest[]; onChanged: () =
   }
   return (
     <Card title={t("Maombi yanayosubiri idhini")} bodyClassName="divide-y divide-ink-100">
-      {items.map((r) => (
-        <div key={r.requestId} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
-          <div className="flex min-w-0 items-start gap-3">
-            <Clock3 size={18} className="mt-0.5 shrink-0 text-standing-warn" />
-            <div className="min-w-0">
-              <div className="font-medium text-ink-950">{r.groupName}</div>
-              <div className="text-xs text-ink-600">
-                {t("Nafasi:")}{' '}{groupRoleLabel(r.requestedRole)}{' '}{t("· Uliomba")}{' '}{wallDate(r.createdAt)}
+      {items.map((r) => {
+        const gate = r.status === 'AwaitingPayment' || r.status === 'Paid';
+        return (
+          <div key={r.requestId} className="px-4 py-3 sm:px-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-3">
+                {gate ? (
+                  <Banknote size={18} className="mt-0.5 shrink-0 text-gold-700" />
+                ) : (
+                  <Clock3 size={18} className="mt-0.5 shrink-0 text-standing-warn" />
+                )}
+                <div className="min-w-0">
+                  <div className="font-medium text-ink-950">{r.groupName}</div>
+                  <div className="text-xs text-ink-600">
+                    {t("Nafasi:")}{' '}{groupRoleLabel(r.requestedRole)}{' '}{t("· Uliomba")}{' '}{wallDate(r.createdAt)}
+                  </div>
+                </div>
               </div>
+              {r.status === 'Pending' && (
+                <Button size="sm" variant="ghost" icon={XCircle} loading={busy === r.requestId} onClick={() => cancel(r.requestId)}>
+                  {t("Ondoa ombi")}
+                </Button>
+              )}
             </div>
+
+            {r.status === 'AwaitingPayment' && (
+              <div className="mt-3 rounded-xl border border-gold-200 bg-gold-50/60 p-3">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-gold-700">
+                  {t("Lipa kwanza — kisha unakuwa mwanachama")}
+                </div>
+                <div className="mt-1 flex flex-wrap items-end gap-x-6 gap-y-2">
+                  <div>
+                    <div className="text-[11px] text-ink-600">{t("Kodi ya malipo")}</div>
+                    <div className="figure text-lg font-semibold tracking-wider text-ink-950">{r.paymentCode}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-ink-600">{t("Kiasi")}</div>
+                    <div className="figure text-lg font-semibold text-ink-950">TSh {num(r.paymentAmount ?? 0)}</div>
+                  </div>
+                  {r.paymentDeadline && (
+                    <div>
+                      <div className="text-[11px] text-ink-600">{t("Mwisho")}</div>
+                      <div className="text-sm font-medium text-ink-950">{wallDate(r.paymentDeadline)}</div>
+                    </div>
+                  )}
+                </div>
+                <p className="mt-2 text-xs text-ink-600">
+                  {t("Tuma kiasi hiki kwenye namba ya kikundi ukiandika kodi hii kwenye maelezo. Siku ya mwisho ikipita bila malipo, ombi linafungwa — hakuna deni linalobaki.")}
+                </p>
+              </div>
+            )}
+
+            {r.status === 'Paid' && (
+              <Notice tone="good" title={t("Malipo yako yamepokelewa")}>
+                {t("Viongozi wanakamilisha usajili wako. Hutakuwa mwanachama hadi wathibitishe.")}
+              </Notice>
+            )}
           </div>
-          <Button size="sm" variant="ghost" icon={XCircle} loading={busy === r.requestId} onClick={() => cancel(r.requestId)}>
-            {t("Ondoa ombi")}
-          </Button>
-        </div>
-      ))}
+        );
+      })}
       <p className="px-4 py-3 text-xs text-ink-600 sm:px-5">
         {t("Viongozi wakiidhinisha, kikundi kitaonekana hapa moja kwa moja ukipakia upya ukurasa.")}
       </p>
@@ -125,6 +172,7 @@ function JoinCard({ initialCode, onRequested }: { initialCode: string; onRequest
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
+  const [sentGate, setSentGate] = useState(false);
 
   async function lookUp(e?: FormEvent) {
     e?.preventDefault();
@@ -152,9 +200,13 @@ function JoinCard({ initialCode, onRequested }: { initialCode: string; onRequest
     setBusy(true);
     setError(null);
     try {
-      await requestToJoin(code, role, note || undefined);
+      const res = await requestToJoin(code, role, note || undefined);
+      setSentGate(res.status === 'AwaitingPayment');
       setSent(true);
-      toast(t("Ombi limetumwa kwa viongozi."), 'good');
+      toast(
+        res.status === 'AwaitingPayment' ? t("Ombi limepokelewa. Lipa kwanza kwa kodi uliyopewa.") : t("Ombi limetumwa kwa viongozi."),
+        'good',
+      );
       onRequested();
     } catch (err) {
       setError(apiErrorMessage(err));
@@ -176,12 +228,18 @@ function JoinCard({ initialCode, onRequested }: { initialCode: string; onRequest
           </motion.span>
           <div>
             <div className="font-semibold text-ink-950">{t("Ombi lako limetumwa kwa")}{' '}{shown.groupName}</div>
-            <p className="mt-1 text-sm text-ink-600">
-              {role === 'Member'
-                ? t("Kiongozi yeyote wa kikundi anaweza kukuidhinisha.")
-                : t("Nafasi ya {0} inaidhinishwa na Mwenyekiti pekee.", { 0: groupRoleLabel(role) })}{' '}
-              {t("Ukishaidhinishwa utaona taarifa yako ya michango — kama ulikuwa mwanachama tayari, viongozi watakuunganisha na kumbukumbu zako za zamani.")}
-            </p>
+            {sentGate ? (
+              <p className="mt-1 text-sm text-ink-600">
+                {t("Kikundi hiki kinakusanya malipo ya kujiunga KABLA ya usajili. Kodi yako ya malipo na kiasi viko juu kwenye \"Maombi yanayosubiri idhini\". Ukishalipa, kiongozi atathibitisha na utakuwa mwanachama.")}
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-ink-600">
+                {role === 'Member'
+                  ? t("Kiongozi yeyote wa kikundi anaweza kukuidhinisha.")
+                  : t("Nafasi ya {0} inaidhinishwa na Mwenyekiti pekee.", { 0: groupRoleLabel(role) })}{' '}
+                {t("Ukishaidhinishwa utaona taarifa yako ya michango — kama ulikuwa mwanachama tayari, viongozi watakuunganisha na kumbukumbu zako za zamani.")}
+              </p>
+            )}
           </div>
         </div>
       </Card>
@@ -363,12 +421,16 @@ function CreateCard() {
         <Field label={t("Jina la kikundi")}>
           <Input value={name} onChange={(e) => setName(e.target.value)} required minLength={3} placeholder={t("Mf. Umoja Mkoba Ukonga")} />
         </Field>
-        <Field label={t("Aina ya michango")}>
+        <Field
+          label={t("Aina ya michango")}
+          hint={t('"Vyote viwili" (mchango wa mwezi + matukio) linakuja kwenye sasisho lijalo — kwa sasa chagua "Kila mwezi" au "Kila tukio".')}
+        >
           <Segmented<GroupTypeName>
             stack
             value={type}
             onChange={setType}
-            options={(Object.keys(GROUP_TYPE_LABEL) as GroupTypeName[]).map((k) => ({
+            /* SASISHO18: Hybrid haijajengwa — haionyeshwi ili mtu asianzishe kikundi kibovu. */
+            options={(['MonthlySavings', 'EventBased'] as GroupTypeName[]).map((k) => ({
               value: k,
               label: t(GROUP_TYPE_LABEL[k].label),
               hint: t(GROUP_TYPE_LABEL[k].hint),

@@ -17,7 +17,7 @@ namespace ChamaLink.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.11")
+                .HasAnnotation("ProductVersion", "8.0.31")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -44,6 +44,655 @@ namespace ChamaLink.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Accounts");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.AuditEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActorMembershipNumber")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ActorRole")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("AfterJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("AllocationResultJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("BeforeJson")
+                        .HasColumnType("text");
+
+                    b.Property<long?>("ChainIndex")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ChangesJson")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("CorrelationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("EffectiveDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Hash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("IpAddress")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsSystemGenerated")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("MemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("PolicyVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PrevHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("SourceMetadataJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("SourceReference")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CorrelationId");
+
+                    b.HasIndex("Timestamp");
+
+                    b.HasIndex("GroupId", "ChainIndex")
+                        .IsUnique()
+                        .HasFilter("\"ChainIndex\" IS NOT NULL");
+
+                    b.HasIndex("GroupId", "MemberId");
+
+                    b.ToTable("AuditEvents");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.BenefitCase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("ArrearsDeducted")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("BeneficiaryGroupMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BenefitRateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CaseNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<decimal?>("CashAvailableAtInitiation")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("CashRecipientName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("CashRecipientPhone")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ClosedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ClosedReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("CountedMemberIdsJson")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("EligibilityJson")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("EventDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExceptionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("GovernanceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("GrossAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Headcount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("HeadcountRuleUsed")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("IsHistorical")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("JoinFeeDeducted")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("LoanArrearsDeducted")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("MkobaReference")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<decimal>("NetAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("PaidConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PaidConfirmedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PaymentChannel")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("PaymentInitiatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PaymentInitiatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PaymentInitiatedToPhone")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal>("PerMemberAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int?>("PolicyVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Relationship")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("SnapshotAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("SubjectName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("VotingDeadline")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BeneficiaryGroupMemberId");
+
+                    b.HasIndex("GroupId", "CaseNumber")
+                        .IsUnique();
+
+                    b.HasIndex("GroupId", "MkobaReference")
+                        .IsUnique()
+                        .HasFilter("\"MkobaReference\" IS NOT NULL");
+
+                    b.HasIndex("GroupId", "Status");
+
+                    b.ToTable("BenefitCases");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.BenefitEvidence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BenefitCaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("DocumentNumber")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("DocumentType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReviewNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UploadedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("VerifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("VerifiedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BenefitCaseId");
+
+                    b.HasIndex("GroupId", "Sha256");
+
+                    b.HasIndex("GroupId", "DocumentType", "DocumentNumber");
+
+                    b.ToTable("BenefitEvidence");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.BenefitGovernance", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("AllowMemberApprovers")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ApproverCannotInitiatePayment")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ApproverRoles")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("AuditorMemberIds")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<bool>("BlockSameSubjectAcrossMembers")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("CashCheckAtApproval")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("ClaimWindowDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ConflictRelationTypes")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<int?>("CooldownDays")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DecidedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("DeductArrears")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("DeductJoinFee")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("DeductLoanArrears")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EvidenceVerifierRoles")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<bool>("ExcludeBeneficiaryFromHeadcount")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ExcludeRelatedParties")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("ExpulsionVotePercent")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("FrequentClaimsFlagCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("FundingSource")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("HeadcountAsOf")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int?>("HeadcountPaidWithinDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("HeadcountRule")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<decimal?>("HighValueThreshold")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("MaxBenefitAmountPerPeriod")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int?>("MaxBenefitPeriodDays")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MinLeaderApprovals")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MinMembershipDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("PaymentConfirmationDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PaymentConfirmerRoles")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("PaymentInitiatorRoles")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<int?>("RecentPolicyChangeFlagDays")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RejectionsToReject")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("RequireCashAvailability")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("RequireJoinFeePaid")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("RequireNoArrearsForEligibility")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("RequiredApprovals")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("StatusChangeApprovals")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("VotingDays")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId", "Status");
+
+                    b.ToTable("BenefitGovernances");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.BenefitLedgerEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("BeneficiaryGroupMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BenefitCaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("PostedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PostedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BenefitCaseId", "Kind")
+                        .IsUnique();
+
+                    b.HasIndex("GroupId", "BeneficiaryGroupMemberId");
+
+                    b.ToTable("BenefitLedgerEntries");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.BenefitRate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AcceptedEvidence")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DecidedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDisabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("MaxClaimsPerMember")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<decimal>("PerMemberAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Relationship")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId", "Category", "Relationship", "EffectiveFrom");
+
+                    b.ToTable("BenefitRates");
                 });
 
             modelBuilder.Entity("ChamaLink.Domain.Entities.ComplianceSnapshot", b =>
@@ -207,6 +856,155 @@ namespace ChamaLink.Infrastructure.Migrations
                     b.ToTable("EventContributions");
                 });
 
+            modelBuilder.Entity("ChamaLink.Domain.Entities.EventObligation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BenefitCaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("DeductedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime?>("DueDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("GroupMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("OverdueFineIssued")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("PaymentCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal>("RequiredAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime?>("SettledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("WaiveReason")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("WaivedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupMemberId");
+
+                    b.HasIndex("BenefitCaseId", "GroupMemberId")
+                        .IsUnique();
+
+                    b.HasIndex("GroupId", "PaymentCode")
+                        .IsUnique();
+
+                    b.HasIndex("GroupId", "GroupMemberId", "Status");
+
+                    b.ToTable("EventObligations");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.FinancialEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("ApprovalNote")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ApprovedByGroupMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AuditTrailId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CorrelationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EvidenceReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("EvidenceType")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("MemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("MetadataJson")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("PolicyVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("SourceReference")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CorrelationId");
+
+                    b.HasIndex("MemberId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("GroupId", "MemberId");
+
+                    b.ToTable("FinancialEvents");
+                });
+
             modelBuilder.Entity("ChamaLink.Domain.Entities.Fine", b =>
                 {
                     b.Property<Guid>("Id")
@@ -274,6 +1072,54 @@ namespace ChamaLink.Infrastructure.Migrations
                     b.ToTable("Fines");
                 });
 
+            modelBuilder.Entity("ChamaLink.Domain.Entities.GovernanceVote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Approve")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("GroupMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("RoleAtVote")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SubjectType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId");
+
+                    b.HasIndex("SubjectType", "SubjectId", "GroupMemberId")
+                        .IsUnique();
+
+                    b.ToTable("GovernanceVotes");
+                });
+
             modelBuilder.Entity("ChamaLink.Domain.Entities.Group", b =>
                 {
                     b.Property<Guid>("Id")
@@ -291,14 +1137,30 @@ namespace ChamaLink.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("JoinCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<string>("OrganizationType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ShortCode")
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)");
 
                     b.Property<int>("Type")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("JoinCode")
+                        .IsUnique()
+                        .HasFilter("\"JoinCode\" IS NOT NULL");
 
                     b.ToTable("Groups");
                 });
@@ -363,6 +1225,9 @@ namespace ChamaLink.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("AccountLinkedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<decimal>("AdvanceBalance")
                         .HasColumnType("numeric");
 
@@ -372,9 +1237,15 @@ namespace ChamaLink.Infrastructure.Migrations
                     b.Property<DateTime>("JoinedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("LeaderPowersFrom")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("MemberNumber")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<DateTime?>("MemberNumberIssuedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Role")
                         .IsRequired()
@@ -393,10 +1264,226 @@ namespace ChamaLink.Infrastructure.Migrations
 
                     b.HasIndex("UserId");
 
+                    b.HasIndex("GroupId", "MemberNumber")
+                        .IsUnique()
+                        .HasFilter("\"MemberNumber\" <> ''");
+
                     b.HasIndex("GroupId", "UserId")
                         .IsUnique();
 
                     b.ToTable("GroupMembers");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.GroupPolicy", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AllocationStrategy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("BeneficiaryExempted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("CollateralCanBeUsedForDefault")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ComplianceStrategy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ContributionStartDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DebtAllocationStrategy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("DueDateDay")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EventApprovalMode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("FineOnPartialPayment")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("FoundingMembersCutoff")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("GracePeriodDays")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("GuarantorRequired")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ImportApprovalMode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal?>("JoinFeeApprovalThreshold")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("JoinFeeCaptureMode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("JoinFeeMode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("JoiningFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("LateFine")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("LoanApprovalMode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("LoanCollateralPercent")
+                        .HasColumnType("numeric");
+
+                    b.Property<bool>("LoanEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("LoanInterestRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<string>("LoanInterestType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("LoanLatePenaltyAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("LoanMaxMultiplier")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<int>("LoanRepaymentDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("LoanStrategy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ManualEntryCutoff")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("MaxConsecutiveMissedMonths")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MinGuarantors")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("MonthlyContribution")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ShortfallStrategy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("WelfareCollectionThreshold")
+                        .HasColumnType("numeric");
+
+                    b.Property<bool>("WelfareEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("WelfareFineAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("WelfareMode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("WithdrawalApprovalMode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId", "EffectiveFrom");
+
+                    b.HasIndex("GroupId", "Version")
+                        .IsUnique();
+
+                    b.ToTable("GroupPolicies");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.GroupResetRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DecidedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("KeepLoans")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId", "Status");
+
+                    b.ToTable("GroupResetRequests");
                 });
 
             modelBuilder.Entity("ChamaLink.Domain.Entities.GroupSettings", b =>
@@ -497,8 +1584,28 @@ namespace ChamaLink.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<DateTime?>("DefaultDecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DefaultDecidedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DefaultReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("DefaultRequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DefaultRequestedByUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("DisbursedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DisbursementReference")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
 
                     b.Property<DateTime>("DueDate")
                         .HasColumnType("timestamp with time zone");
@@ -522,6 +1629,9 @@ namespace ChamaLink.Infrastructure.Migrations
 
                     b.Property<bool>("LatePenaltyCharged")
                         .HasColumnType("boolean");
+
+                    b.Property<Guid?>("LoanApplicationId")
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("PrincipalAmount")
                         .HasPrecision(18, 2)
@@ -552,9 +1662,1819 @@ namespace ChamaLink.Infrastructure.Migrations
 
                     b.HasIndex("IssuedByGroupMemberId");
 
+                    b.HasIndex("GroupId", "DisbursementReference")
+                        .IsUnique()
+                        .HasFilter("\"DisbursementReference\" IS NOT NULL");
+
                     b.HasIndex("GroupId", "Status");
 
                     b.ToTable("Loans");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.LoanApplication", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("ApplicationNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime?>("ApprovalExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("BorrowerGroupMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CloseReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ClosedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DisbursedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DisbursementConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DisbursementConfirmedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DisbursementInitiatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DisbursementInitiatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EligibilityJson")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("InterestAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("InterestPercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)");
+
+                    b.Property<Guid?>("LoanId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("MkobaReference")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("Purpose")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("RecipientNote")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<int>("RepaymentMonths")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("RequiredApprovals")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BorrowerGroupMemberId");
+
+                    b.HasIndex("GroupId", "ApplicationNumber")
+                        .IsUnique();
+
+                    b.HasIndex("GroupId", "MkobaReference")
+                        .IsUnique()
+                        .HasFilter("\"MkobaReference\" IS NOT NULL");
+
+                    b.HasIndex("GroupId", "Status");
+
+                    b.ToTable("LoanApplications");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.LoginFailure", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Count")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("IpKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<DateTime?>("LockoutEndUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("WindowStartUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "IpKey")
+                        .IsUnique();
+
+                    b.ToTable("LoginFailures");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.MemberAppeal", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AppellantUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DecidedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DecisionNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("DecisionWindowDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("EffectSummary")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("FiledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("GroupMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1500)
+                        .HasColumnType("character varying(1500)");
+
+                    b.Property<int>("RequiredApprovals")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("SubjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SubjectSummary")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupMemberId");
+
+                    b.HasIndex("GroupId", "Status");
+
+                    b.HasIndex("GroupId", "GroupMemberId", "Status");
+
+                    b.ToTable("MemberAppeals");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.MemberAppealVote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AppealId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Approve")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppealId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("MemberAppealVotes");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.MemberNotification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Link")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("LocJson")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RecipientGroupMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecipientGroupMemberId", "ReadAt");
+
+                    b.ToTable("MemberNotifications");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.MemberPhone", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("AddedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ApprovedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("EndRequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("EndRequestedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("GroupMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("MatchedInMkoba")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("MkobaNameSeen")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PendingEndReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("PendingValidTo")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("ValidFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ValidTo")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupMemberId");
+
+                    b.HasIndex("GroupId", "Phone");
+
+                    b.ToTable("MemberPhones");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.MemberRelation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ApprovedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DecisionNote")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("EndReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTime?>("EndRequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("EndRequestedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("EndedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("EndedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MemberAId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MemberBId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MemberAId");
+
+                    b.HasIndex("MemberBId");
+
+                    b.HasIndex("GroupId", "Status");
+
+                    b.ToTable("MemberRelations");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.MemberStatusChangeRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("AppliedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("EffectiveDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EvidenceNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("FromStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid?>("GovernanceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("GroupMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsExpulsion")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("LeadersOnly")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("RejectionsToReject")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("RequiredApprovals")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("ToStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupMemberId");
+
+                    b.HasIndex("GroupId", "Status");
+
+                    b.ToTable("MemberStatusChangeRequests");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.MemberStatusHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ChangedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FromStatus")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("MetadataJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ToStatus")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MemberId");
+
+                    b.ToTable("MemberStatusHistories");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.MembershipRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DecidedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DecisionNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("LinkedMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<decimal?>("PaymentAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("PaymentCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("PaymentConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("PaymentDeadline")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PaymentReceiptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PaymentReference")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("RequestedRole")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("SuggestedMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("GroupId", "PaymentCode")
+                        .IsUnique()
+                        .HasFilter("\"PaymentCode\" IS NOT NULL");
+
+                    b.HasIndex("GroupId", "Status");
+
+                    b.ToTable("MembershipRequests");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.MkobaRawTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime?>("AttributedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("AttributedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AttributedGroupMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AttributionReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<decimal?>("Balance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ImportId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ImportedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ImportedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsWithdrawal")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("PayerName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<int>("RowOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StatementFileHash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId", "AttributedGroupMemberId");
+
+                    b.HasIndex("GroupId", "Phone");
+
+                    b.HasIndex("GroupId", "Reference")
+                        .IsUnique();
+
+                    b.HasIndex("GroupId", "Timestamp");
+
+                    b.ToTable("MkobaRawTransactions");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.MkobaStatementGap", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AfterReference")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ApprovedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AssignedGroupMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("AssumedTimestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("BeforeReference")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("DetectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Evidence")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RequestedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ResolutionStatus")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("WindowEnd")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("WindowStart")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId", "BeforeReference")
+                        .IsUnique();
+
+                    b.ToTable("MkobaStatementGaps");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.MkobaStatementImport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("BackdatedRows")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ConflictingRows")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DecidedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DecisionNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("ExistingRows")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("FileHash")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("FileName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<long>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("LastBalance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("NewRows")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("PeriodFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("PeriodTo")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReportJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("RowsInPdf")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RowsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("StorageKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UploadedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId", "Status");
+
+                    b.ToTable("MkobaStatementImports");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.MkobaWithdrawalExplanation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DecidedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DecisionNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("MkobaReference")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId", "MkobaReference");
+
+                    b.ToTable("MkobaWithdrawalExplanations");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.PaymentClaim", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DecidedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DecisionNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("GroupMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("PaymentCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("ReceiptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId", "GroupMemberId");
+
+                    b.HasIndex("GroupId", "Reference")
+                        .IsUnique();
+
+                    b.HasIndex("GroupId", "Status");
+
+                    b.ToTable("PaymentClaims");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.PaymentReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("ClaimedByGroupMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ConfirmedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ConfirmedGroupMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("MatchRule")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("MembershipRequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("MkobaTransactionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PayerName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("PaymentCodeSeen")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<DateTime?>("SecondApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("SecondApproverUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("SuggestedGroupMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SuggestedObligationId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId", "MembershipRequestId");
+
+                    b.HasIndex("GroupId", "MkobaTransactionId")
+                        .IsUnique()
+                        .HasFilter("\"MkobaTransactionId\" IS NOT NULL");
+
+                    b.HasIndex("GroupId", "Status");
+
+                    b.ToTable("PaymentReceipts");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.PlatformAdmin", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByPlatformAdminId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeactivatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastMfaVerifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Level")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("MfaEnabledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PendingTotpSecretProtected")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)");
+
+                    b.Property<string>("TotpSecretProtected")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("PlatformAdmins");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.PlatformApproval", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DecidedByPlatformAdminId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DecisionNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PayloadJson")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("RequestedByPlatformAdminId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("TargetPlatformAdminId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TargetUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId", "Status");
+
+                    b.HasIndex("Status", "Action");
+
+                    b.ToTable("PlatformApprovals");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.PlatformAuditEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DetailJson")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid?>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Ip")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("PlatformAdminId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("SubjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("At");
+
+                    b.HasIndex("GroupId", "At");
+
+                    b.HasIndex("PlatformAdminId", "At");
+
+                    b.ToTable("PlatformAuditEvents");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.PlatformPasswordResetCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("IssuedByPlatformAdminId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Salt")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("UserId", "UsedAt");
+
+                    b.ToTable("PlatformPasswordResetCodes");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.RefreshToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedByIp")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("FamilyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ReplacedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("TokenVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "FamilyId");
+
+                    b.ToTable("RefreshTokens");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.RoleChangeRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("CoolingOffDaysApplied")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DecisionNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("FromRole")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("GroupMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("LeadersOnly")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("RejectionsToReject")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("RequiredApprovals")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("ToRole")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId", "Status");
+
+                    b.ToTable("RoleChangeRequests");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.SmsAccount", b =>
+                {
+                    b.Property<Guid>("GroupId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Credits")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TotalPurchased")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TotalSent")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("GroupId");
+
+                    b.ToTable("SmsAccounts");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.SmsMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(360)
+                        .HasColumnType("character varying(360)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Credits")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("DeliveredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("GroupMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("ProviderReference")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("ProviderStatus")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<Guid?>("RelatedEntityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RelatedEntityType")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime?>("SendAfter")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("SuppressedReason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("TemplateKey")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProviderReference");
+
+                    b.HasIndex("GroupId", "CreatedAt");
+
+                    b.HasIndex("GroupId", "Status", "SendAfter");
+
+                    b.ToTable("SmsMessages");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.TruthAdjustmentRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DecidedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ExtraDays")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("GroupMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Month")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId", "Year", "Month");
+
+                    b.ToTable("TruthAdjustments");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.TruthGroupSettings", b =>
+                {
+                    b.Property<Guid>("GroupId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AppealApprovalsRequired")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("AppealWindowDays")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("AppealsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("AutoDeductSavings")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("BeneficiaryContributes")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("CashStatementMaxAgeDays")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("ClaimsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("ContributionStartDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DueDateDay")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("EventFineGraceDays")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("EventTopUpWindowDays")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("FineOnPartialPayment")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("FoundingMembersCutoff")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("GracePeriodDays")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("JoiningFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<bool>("JoiningPaymentRequired")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("JoiningPaymentWindowDays")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("JoiningSavingsPortion")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("LateFine")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("LateFinePercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<int?>("LeaderCoolingOffDays")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("LoanAllowMultipleActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("LoanAllowWithArrears")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("LoanApprovalValidDays")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("LoanInterestPercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)");
+
+                    b.Property<decimal>("LoanLatePenaltyAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("LoanMaxAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("LoanMaxMultipleOfContributions")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)");
+
+                    b.Property<decimal>("LoanMinCashReserve")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int?>("LoanMinMembershipMonths")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("LoanRepaymentMonths")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("LoanRequiredApprovals")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("LoansEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ManualEntryCutoff")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("MaxEventDeductionPerMemberPerMonth")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("MaxEventsPerMonth")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("MemberMinimumBalance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("MonthlyContribution")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("OverdueEventFineAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("PaymentSecondApprovalAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("ReinstatementFineMultiplier")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)");
+
+                    b.Property<bool>("ReinstatementRequiresJoiningFee")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("RemovalApprovalsRequired")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("RoleChangeApprovals")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("SmsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("SmsLowCreditThreshold")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SmsMaxCharsPerMessage")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SmsMaxPerMemberPerEvent")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SmsQuietFromHour")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SmsQuietToHour")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("GroupId");
+
+                    b.ToTable("TruthGroupSettings");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.TruthSettingsProposal", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DecidedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DecisionNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId", "Status");
+
+                    b.ToTable("TruthSettingsProposals");
                 });
 
             modelBuilder.Entity("ChamaLink.Domain.Entities.User", b =>
@@ -570,9 +3490,15 @@ namespace ChamaLink.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int>("FailedLoginCount")
+                        .HasColumnType("integer");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<DateTime?>("LockoutEndUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -581,6 +3507,9 @@ namespace ChamaLink.Infrastructure.Migrations
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<int>("TokenVersion")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -630,6 +3559,224 @@ namespace ChamaLink.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("WalletWithdrawals");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.WelfareContribution", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("AuditTrailId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("FinancialEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PaidBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("WelfareEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("WelfareObligationId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FinancialEventId");
+
+                    b.HasIndex("WelfareObligationId");
+
+                    b.ToTable("WelfareContributions");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.WelfareDisbursement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("ApprovedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AuditTrailId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BeneficiaryMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BeneficiaryName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("DisbursedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DisbursedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("FinancialEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Reference")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("WelfareEventId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FinancialEventId");
+
+                    b.HasIndex("WelfareEventId");
+
+                    b.ToTable("WelfareDisbursements");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.WelfareEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BeneficiaryMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BeneficiaryName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("CollectionMethod")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeadlineDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("PolicyVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("RequiredContributionPerMember")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("TotalCollected")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("TotalDisbursed")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("TotalExpected")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BeneficiaryMemberId");
+
+                    b.HasIndex("GroupId");
+
+                    b.ToTable("WelfareEvents");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.WelfareObligation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DueDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("PaidAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("RequiredAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("WaivedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("WaivedReason")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("WelfareEventId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MemberId");
+
+                    b.HasIndex("WelfareEventId", "MemberId")
+                        .IsUnique();
+
+                    b.ToTable("WelfareObligations");
                 });
 
             modelBuilder.Entity("ChamaLink.Domain.Entities.Withdrawal", b =>
@@ -759,6 +3906,15 @@ namespace ChamaLink.Infrastructure.Migrations
                     b.Navigation("GroupMember");
                 });
 
+            modelBuilder.Entity("ChamaLink.Domain.Entities.BenefitEvidence", b =>
+                {
+                    b.HasOne("ChamaLink.Domain.Entities.BenefitCase", null)
+                        .WithMany("Evidence")
+                        .HasForeignKey("BenefitCaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("ChamaLink.Domain.Entities.ComplianceSnapshot", b =>
                 {
                     b.HasOne("ChamaLink.Domain.Entities.Group", "Group")
@@ -814,6 +3970,42 @@ namespace ChamaLink.Infrastructure.Migrations
                     b.Navigation("GroupEvent");
 
                     b.Navigation("GroupMember");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.EventObligation", b =>
+                {
+                    b.HasOne("ChamaLink.Domain.Entities.Group", "Group")
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ChamaLink.Domain.Entities.GroupMember", "GroupMember")
+                        .WithMany()
+                        .HasForeignKey("GroupMemberId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Group");
+
+                    b.Navigation("GroupMember");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.FinancialEvent", b =>
+                {
+                    b.HasOne("ChamaLink.Domain.Entities.Group", "Group")
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ChamaLink.Domain.Entities.GroupMember", "Member")
+                        .WithMany()
+                        .HasForeignKey("MemberId");
+
+                    b.Navigation("Group");
+
+                    b.Navigation("Member");
                 });
 
             modelBuilder.Entity("ChamaLink.Domain.Entities.Fine", b =>
@@ -879,6 +4071,17 @@ namespace ChamaLink.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("ChamaLink.Domain.Entities.GroupPolicy", b =>
+                {
+                    b.HasOne("ChamaLink.Domain.Entities.Group", "Group")
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Group");
+                });
+
             modelBuilder.Entity("ChamaLink.Domain.Entities.GroupSettings", b =>
                 {
                     b.HasOne("ChamaLink.Domain.Entities.Group", "Group")
@@ -891,6 +4094,11 @@ namespace ChamaLink.Infrastructure.Migrations
                         {
                             b1.Property<Guid>("GroupSettingsGroupId")
                                 .HasColumnType("uuid");
+
+                            b1.Property<string>("ComplianceStrategy")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("ComplianceStrategy");
 
                             b1.Property<string>("DebtAllocationStrategy")
                                 .IsRequired()
@@ -923,6 +4131,11 @@ namespace ChamaLink.Infrastructure.Migrations
                                 .HasPrecision(18, 2)
                                 .HasColumnType("numeric(18,2)")
                                 .HasColumnName("MonthlyContribution");
+
+                            b1.Property<string>("ShortfallStrategy")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("ShortfallStrategy");
 
                             b1.HasKey("GroupSettingsGroupId");
 
@@ -980,6 +4193,42 @@ namespace ChamaLink.Infrastructure.Migrations
 
                             b1.WithOwner()
                                 .HasForeignKey("GroupSettingsGroupId");
+
+                            b1.OwnsOne("ChamaLink.Domain.Entities.JoinFeeSettings", "JoinFeeConfig", b2 =>
+                                {
+                                    b2.Property<Guid>("FinancialSettingsGroupSettingsGroupId")
+                                        .HasColumnType("uuid");
+
+                                    b2.Property<decimal?>("ApprovalThreshold")
+                                        .HasPrecision(18, 2)
+                                        .HasColumnType("numeric(18,2)")
+                                        .HasColumnName("JoinFeeApprovalThreshold");
+
+                                    b2.Property<string>("CaptureMode")
+                                        .IsRequired()
+                                        .HasColumnType("text")
+                                        .HasColumnName("JoinFeeCaptureMode");
+
+                                    b2.Property<string>("Mode")
+                                        .IsRequired()
+                                        .HasColumnType("text")
+                                        .HasColumnName("JoinFeeMode");
+
+                                    b2.Property<decimal>("RequiredAmount")
+                                        .HasPrecision(18, 2)
+                                        .HasColumnType("numeric(18,2)")
+                                        .HasColumnName("JoinFeeRequiredAmount");
+
+                                    b2.HasKey("FinancialSettingsGroupSettingsGroupId");
+
+                                    b2.ToTable("GroupSettings");
+
+                                    b2.WithOwner()
+                                        .HasForeignKey("FinancialSettingsGroupSettingsGroupId");
+                                });
+
+                            b1.Navigation("JoinFeeConfig")
+                                .IsRequired();
                         });
 
                     b.OwnsOne("ChamaLink.Domain.Entities.GovernanceSettings", "Governance", b1 =>
@@ -1120,6 +4369,10 @@ namespace ChamaLink.Infrastructure.Migrations
                                 .HasColumnType("boolean")
                                 .HasColumnName("LoanEnabled");
 
+                            b1.Property<bool>("GuarantorRequired")
+                                .HasColumnType("boolean")
+                                .HasColumnName("GuarantorRequired");
+
                             b1.Property<decimal>("InterestRate")
                                 .HasPrecision(5, 2)
                                 .HasColumnType("numeric(5,2)")
@@ -1135,10 +4388,19 @@ namespace ChamaLink.Infrastructure.Migrations
                                 .HasColumnType("numeric(18,2)")
                                 .HasColumnName("LoanLatePenaltyAmount");
 
+                            b1.Property<string>("LoanStrategy")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("LoanStrategy");
+
                             b1.Property<decimal?>("MaxLoanMultiplier")
                                 .HasPrecision(5, 2)
                                 .HasColumnType("numeric(5,2)")
                                 .HasColumnName("LoanMaxMultiplier");
+
+                            b1.Property<int>("MinGuarantors")
+                                .HasColumnType("integer")
+                                .HasColumnName("MinGuarantors");
 
                             b1.Property<int>("RepaymentDays")
                                 .HasColumnType("integer")
@@ -1233,6 +4495,71 @@ namespace ChamaLink.Infrastructure.Migrations
                     b.Navigation("IssuedByGroupMember");
                 });
 
+            modelBuilder.Entity("ChamaLink.Domain.Entities.MemberAppeal", b =>
+                {
+                    b.HasOne("ChamaLink.Domain.Entities.Group", null)
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ChamaLink.Domain.Entities.GroupMember", null)
+                        .WithMany()
+                        .HasForeignKey("GroupMemberId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.MemberAppealVote", b =>
+                {
+                    b.HasOne("ChamaLink.Domain.Entities.MemberAppeal", null)
+                        .WithMany()
+                        .HasForeignKey("AppealId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.MemberStatusHistory", b =>
+                {
+                    b.HasOne("ChamaLink.Domain.Entities.GroupMember", "Member")
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Member");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.MembershipRequest", b =>
+                {
+                    b.HasOne("ChamaLink.Domain.Entities.Group", "Group")
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ChamaLink.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Group");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.PlatformAdmin", b =>
+                {
+                    b.HasOne("ChamaLink.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("ChamaLink.Domain.Entities.WalletWithdrawal", b =>
                 {
                     b.HasOne("ChamaLink.Domain.Entities.Group", "Group")
@@ -1242,6 +4569,80 @@ namespace ChamaLink.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Group");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.WelfareContribution", b =>
+                {
+                    b.HasOne("ChamaLink.Domain.Entities.FinancialEvent", "FinancialEvent")
+                        .WithMany()
+                        .HasForeignKey("FinancialEventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ChamaLink.Domain.Entities.WelfareObligation", "Obligation")
+                        .WithMany()
+                        .HasForeignKey("WelfareObligationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FinancialEvent");
+
+                    b.Navigation("Obligation");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.WelfareDisbursement", b =>
+                {
+                    b.HasOne("ChamaLink.Domain.Entities.FinancialEvent", "FinancialEvent")
+                        .WithMany()
+                        .HasForeignKey("FinancialEventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ChamaLink.Domain.Entities.WelfareEvent", "WelfareEvent")
+                        .WithMany()
+                        .HasForeignKey("WelfareEventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FinancialEvent");
+
+                    b.Navigation("WelfareEvent");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.WelfareEvent", b =>
+                {
+                    b.HasOne("ChamaLink.Domain.Entities.GroupMember", "BeneficiaryMember")
+                        .WithMany()
+                        .HasForeignKey("BeneficiaryMemberId");
+
+                    b.HasOne("ChamaLink.Domain.Entities.Group", "Group")
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BeneficiaryMember");
+
+                    b.Navigation("Group");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.WelfareObligation", b =>
+                {
+                    b.HasOne("ChamaLink.Domain.Entities.GroupMember", "Member")
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ChamaLink.Domain.Entities.WelfareEvent", "WelfareEvent")
+                        .WithMany("Obligations")
+                        .HasForeignKey("WelfareEventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Member");
+
+                    b.Navigation("WelfareEvent");
                 });
 
             modelBuilder.Entity("ChamaLink.Domain.Entities.Withdrawal", b =>
@@ -1315,6 +4716,11 @@ namespace ChamaLink.Infrastructure.Migrations
                     b.Navigation("LedgerEntries");
                 });
 
+            modelBuilder.Entity("ChamaLink.Domain.Entities.BenefitCase", b =>
+                {
+                    b.Navigation("Evidence");
+                });
+
             modelBuilder.Entity("ChamaLink.Domain.Entities.Group", b =>
                 {
                     b.Navigation("Members");
@@ -1325,6 +4731,11 @@ namespace ChamaLink.Infrastructure.Migrations
             modelBuilder.Entity("ChamaLink.Domain.Entities.User", b =>
                 {
                     b.Navigation("GroupMemberships");
+                });
+
+            modelBuilder.Entity("ChamaLink.Domain.Entities.WelfareEvent", b =>
+                {
+                    b.Navigation("Obligations");
                 });
 
             modelBuilder.Entity("ChamaLink.Domain.Entities.Withdrawal", b =>

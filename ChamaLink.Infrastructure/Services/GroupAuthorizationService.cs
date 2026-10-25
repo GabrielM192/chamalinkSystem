@@ -23,32 +23,37 @@ public class GroupAuthorizationService
     // Confirms the given (authenticated) user is actually a member of
     // this group, and returns their GroupMember row - callers use this
     // as "who is the caller, as a member of this specific group".
+    // SASISHO17 (P0-1): uanachama HAI tu. Aliyesimamishwa/aliyetoka/aliyefariki/aliyehifadhiwa hana ruhusa yoyote
+    // (chanzo kimoja: Common.MemberAccess). Kusoma taarifa YAKO mwenyewe: RequireOwnRecordAsync.
     public async Task<GroupMember> RequireMembershipAsync(Guid userId, Guid groupId)
-    {
-        var member = await _context.GroupMembers
-            .FirstOrDefaultAsync(m => m.UserId == userId && m.GroupId == groupId);
+        => await Common.MemberAccess.RequireActiveAsync(_context, groupId, userId);
 
-        if (member == null)
-            throw new UnauthorizedAccessException("Wewe si mwanachama wa kikundi hiki.");
-
-        return member;
-    }
+    /// <summary>
+    /// Rekodi yako (hali yoyote) — KWA KUSOMA TAARIFA YAKO MWENYEWE TU (mf. aliyetoka anaona hesabu yake ya mwisho).
+    /// Usiitumie kwa kitendo chochote cha kuandika wala taarifa za wengine.
+    /// </summary>
+    public async Task<GroupMember> RequireOwnRecordAsync(Guid userId, Guid groupId)
+        => await Common.MemberAccess.FindAsync(_context, groupId, userId, default, tracking: false)
+           ?? throw new ChamaLink.Domain.Exceptions.ForbiddenException(Common.MemberAccess.NotMemberMessage);
 
     // Same as above, but additionally requires the member to hold one of
     // the given leadership roles (e.g. only Chairperson may update
     // settings; only Treasurer/Chairperson may issue a loan).
+    // SASISHO16: majina ya nafasi kwa Kiswahili (si majina ya enum ya code kama "Chairperson") kwenye ujumbe wa mtumiaji
+    private static string RoleNames(IEnumerable<GroupRole> roles) => string.Join(" au ", roles.Distinct().OrderBy(r => r).Select(r => r switch
+    {
+        GroupRole.Chairperson => "Mwenyekiti",
+        GroupRole.Treasurer => "Mtunza-hazina",
+        GroupRole.Secretary => "Katibu",
+        GroupRole.MemberRepresentative => "Mwakilishi wa wanachama",
+        _ => "Mwanachama"
+    }));
+
     public async Task<GroupMember> RequireRoleAsync(Guid userId, Guid groupId, params GroupRole[] allowedRoles)
     {
         var member = await RequireMembershipAsync(userId, groupId);
-
-        if (!allowedRoles.Contains(member.Role))
-        {
-            var roleNames = string.Join(" au ", allowedRoles);
-            throw new UnauthorizedAccessException(
-                $"Huna ruhusa ya kufanya hili. Inahitaji: {roleNames}.");
-        }
-
-        return member;
+        // SASISHO17: nafasi INAYOTUMIKA (kiongozi aliye kwenye kipindi cha kusubiri = Mwanachama)
+        return Common.MemberAccess.EnsureRole(member, allowedRoles, $"Huna ruhusa ya kufanya hili. Inahitaji: {RoleNames(allowedRoles)}.");
     }
 
     // Turns an ApprovalPolicy into the concrete set of roles allowed to
@@ -67,11 +72,9 @@ public class GroupAuthorizationService
         var member = await RequireMembershipAsync(userId, groupId);
         var allowedRoles = ResolveApprovalRoles(policy);
 
-        if (!allowedRoles.Contains(member.Role))
+        if (!allowedRoles.Contains(Common.MemberAccess.EffectiveRole(member)))
         {
-            var roleNames = string.Join(" au ", allowedRoles);
-            throw new UnauthorizedAccessException(
-                $"Huna ruhusa ya kufanya hili. Inahitaji: {roleNames}.");
+            throw new ChamaLink.Domain.Exceptions.ForbiddenException($"Huna ruhusa ya kufanya hili. Inahitaji: {RoleNames(allowedRoles)}.");
         }
 
         return member;

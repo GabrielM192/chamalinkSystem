@@ -157,7 +157,7 @@ public class ReconciliationService
             if (unmatchedCount > 0)
                 dto.Warnings.Add(
                     $"M-Koba: miamala {unmatchedCount} (TSH {unmatchedAmount:N0}) " +
-                    "haikulingana na mwanachama yeyote - angalia namba za simu.");
+                    $"haikulingana na mwanachama yeyote - angalia namba za simu.");
         }
 
         // ═══════════════ CHANZO 2: Excel ya mtunza-hazina ═══════════════
@@ -184,7 +184,7 @@ public class ReconciliationService
                     if (rowTotal > 0 || (row.JoiningFee ?? 0) > 0)
                         dto.Warnings.Add(
                             $"Excel: safu '{row.ExcelName}' (TSH {rowTotal:N0}) " +
-                            "haikulingana na mwanachama - imeachwa kwenye ulinganisho.");
+                            $"haikulingana na mwanachama - imeachwa kwenye ulinganisho.");
                     continue;
                 }
 
@@ -207,7 +207,7 @@ public class ReconciliationService
                     dto.Warnings.Add(
                         $"Excel: '{row.ExcelName}' ana MSIBA/SHEREHE " +
                         $"(TSH {(row.Msiba ?? 0) + (row.Sherehe ?? 0):N0}) - " +
-                        "matumizi ya ustawi hayalinganishwi na michango.");
+                        $"matumizi ya ustawi hayalinganishwi na michango.");
             }
         }
 
@@ -226,7 +226,8 @@ public class ReconciliationService
         var ledgerJoining = new decimal[n];
 
         var ledgerByUser = entries
-            .GroupBy(e => e.UserId)
+            .Where(e => e.UserId.HasValue)          // UserId null = isiangushe ripoti (ToDictionary haikubali ufunguo null)
+            .GroupBy(e => e.UserId!.Value)
             .ToDictionary(g => g.Key, g => g.ToList());
 
         for (int i = 0; i < n; i++)
@@ -251,7 +252,8 @@ public class ReconciliationService
             .ToListAsync();
 
         var jfByUser = jfEntries
-            .GroupBy(e => e.UserId)
+            .Where(e => e.UserId.HasValue)
+            .GroupBy(e => e.UserId!.Value)
             .ToDictionary(g => g.Key, g => g.Sum(e => e.Amount));
 
         for (int i = 0; i < n; i++)
@@ -333,15 +335,15 @@ public class ReconciliationService
                     jfRow.Status = ReconciliationStatus.MfumoZiada;
                     jfRow.Reason =
                         $"Mfumo una KIANZIO zaidi (+{jfRow.Difference:N0}) kuliko Excel - " +
-                        "huenda ni ziada ya michango iliyopelekwa KIANZIO kiotomatiki " +
-                        "(sio kosa, lakini thibitisha).";
+                        $"huenda ni ziada ya michango iliyopelekwa KIANZIO kiotomatiki " +
+                        $"(sio kosa, lakini thibitisha).";
                 }
                 else
                 {
                     jfRow.Status = ReconciliationStatus.MfumoChini;
                     jfRow.Reason =
                         $"Mfumo una KIANZIO chini ({-jfRow.Difference:N0}) kuliko Excel - " +
-                        "huenda KIANZIO ya Excel bado haijaingizwa mfumo.";
+                        $"huenda KIANZIO ya Excel bado haijaingizwa mfumo.";
                 }
 
                 dto.Rows.Add(jfRow);
@@ -371,7 +373,7 @@ public class ReconciliationService
                 dto.Warnings.Add(
                     $"M-Koba: '{members[i].Name}' ana withdrawals TSH " +
                     $"{mkobaWithdrawals[i]:N0} mwaka {year} (mikopo/matokeo - " +
-                    "siyo michango, hazilinganishwi hapa).");
+                    $"siyo michango, hazilinganishwi hapa).");
         }
 
         return dto;
@@ -399,12 +401,12 @@ public class ReconciliationService
             if (lateFine > 0 && gap == lateFine)
                 row.Reason =
                     $"PDF na Excel zinapotofautiana kwa TSH {gap:N0} = faini ya kuchelewa. " +
-                    "Huenda mmoja amerejelea faini, mwingine la — thibitisha nani alichelewa.";
+                    $"Huenda mmoja amerejelea faini, mwingine la — thibitisha nani alichelewa.";
             else
                 row.Reason =
                     $"PDF ({pdf:N0}) na Excel ({excel:N0}) hazilingani " +
                     $"(tofauti TSH {gap:N0}). Mfumo umerekodi {ledger:N0}. " +
-                    "Thibitisha kwenye risiti/chapo la benki.";
+                    $"Thibitisha kwenye risiti/chapo la benki.";
             return;
         }
 
@@ -424,9 +426,9 @@ public class ReconciliationService
             row.Status = ReconciliationStatus.MfumoChini;
             row.Reason =
                 $"Mfumo umerekodi TSH {-row.Difference:N0} CHINI kuliko nyaraka. " +
-                "Sababu zinazowezekana: (1) mchango bado haujaingizwa mfumo, " +
-                "(2) mwanachama hakulinganishwa wakati wa import, " +
-                "(3) tarehe ya entry iko mwezi mwingine.";
+                $"Sababu zinazowezekana: (1) mchango bado haujaingizwa mfumo, " +
+                $"(2) mwanachama hakulinganishwa wakati wa import, " +
+                $"(3) tarehe ya entry iko mwezi mwingine.";
             return;
         }
 
@@ -439,15 +441,15 @@ public class ReconciliationService
         {
             row.Reason =
                 $"Ledger ({ledger:N0}) = PDF + Excel ({pdf:N0} + {excel:N0}). " +
-                "DALILI YA IMPORT MARA MBILI: huenda uliingiza taarifa ya M-Koba " +
-                "NA Excel ya mwezi ule ule. Chunguza entries za ledger.";
+                $"DALILI YA IMPORT MARA MBILI: huenda uliingiza taarifa ya M-Koba " +
+                $"NA Excel ya mwezi ule ule. Chunguza entries za ledger.";
             return;
         }
 
         row.Reason =
             $"Mfumo una TSH {row.Difference:N0} ZAIDI kuliko nyaraka. " +
-            "Sababu zinazowezekana: mchango wa mkono ulioingizwa moja kwa moja, " +
-            "au ziada halisi ya mwanachama.";
+            $"Sababu zinazowezekana: mchango wa mkono ulioingizwa moja kwa moja, " +
+            $"au ziada halisi ya mwanachama.";
     }
 
     // ── Kulinganisha miamala ya M-Koba na mwanachama kwa simu ─────────

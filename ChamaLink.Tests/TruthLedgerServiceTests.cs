@@ -38,6 +38,14 @@ public class TruthLedgerServiceTests
         public Guid GroupId, Frank, Tunganege, Treasurer = Guid.NewGuid(), Chair = Guid.NewGuid(), ChairMember = Guid.NewGuid();
     }
 
+    /// <summary>Namba inaunganishwa na mtunza-hazina na KUIDHINISHWA na mwenyekiti (maker-checker) — ndipo inahesabiwa.</summary>
+    private static async Task<TruthSetupService.PhoneResult> Link(World w, Guid member, string phone)
+    {
+        var r = await w.Setup.AddPhoneAsync(w.GroupId, member, phone, w.Treasurer, null);
+        await w.Setup.DecidePhoneAsync(w.GroupId, r.Phone.Id, true, w.Chair, null);
+        return r;
+    }
+
     private static async Task<World> Build()
     {
         var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -100,8 +108,55 @@ public class TruthLedgerServiceTests
         return rows;
     }
 
-    private static Task<TruthSetupService.ImportReport> Import(World w)
-        => w.Setup.ImportMkobaStatementAsync(w.GroupId, new MemoryStream(new byte[] { 1 }), Guid.NewGuid());
+    /// <summary>PDF bandia: inapita ukaguzi wa "%PDF-" lakini kurasa hazisomwi na PdfPig (parser bandia ndiyo inayorudisha safu).</summary>
+    internal sealed class FakePdfImports : StatementImportService
+    {
+        public FakePdfImports(ApplicationDbContext db, IMKobaParserService parser, ChamaLink.Infrastructure.Services.Benefits.IEvidenceStorage storage, TruthSetupService setup)
+            : base(db, parser, storage, setup, new ChamaLink.Infrastructure.Services.Benefits.NotificationService(db),
+                new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(),
+                new ChamaLink.Infrastructure.Services.Events.EventWalletService(db, new TruthLedgerService(db))) { }
+        protected override int CountPages(byte[] bytes) => 1;
+    }
+
+    private static int _pdfSeq;
+    internal static byte[] FakePdf() => System.Text.Encoding.ASCII.GetBytes($"%PDF-1.4 bandia {Interlocked.Increment(ref _pdfSeq)}");
+
+    /// <summary>
+    /// SASISHO17: import = mtunza-hazina anapakia (rasimu) → mwenyekiti anaidhinisha. Ikiwa safu zote zipo tayari, kupakia kunakataliwa
+    /// (409) — ripoti inarudishwa kama "0 mpya" ili majaribio ya zamani ya kurudia PDF yaendelee kuthibitisha kutorudufu.
+    /// </summary>
+    private static async Task<TruthSetupService.ImportReport> Import(World w)
+    {
+        // Viongozi wawili wenye akaunti wanahitajika kwa maker-checker ya PDF. Wanaongezwa kwa muda wa import tu ili
+        // hesabu za kikundi (idadi ya wanachama, ripoti za mwezi) za majaribio haya ya Frank/Tunganege zisibadilike.
+        var leaders = new List<GroupMember>();
+        foreach (var (uid, role) in new[] { (w.Treasurer, GroupRole.Treasurer), (w.Chair, GroupRole.Chairperson) })
+        {
+            if (!await w.Db.Users.AnyAsync(u => u.Id == uid))
+                w.Db.Users.Add(new User { Id = uid, FullName = role.ToString(), PhoneNumber = "", Email = $"{uid:N}@mfano.tz", PasswordHash = "x" });
+            var gm = new GroupMember { Id = uid == w.Chair ? w.ChairMember : Guid.NewGuid(), GroupId = w.GroupId, UserId = uid, Role = role };
+            w.Db.GroupMembers.Add(gm); leaders.Add(gm);
+        }
+        await w.Db.SaveChangesAsync();
+        try { return await ImportCore(w); }
+        finally { w.Db.GroupMembers.RemoveRange(leaders); await w.Db.SaveChangesAsync(); }
+    }
+
+    private static async Task<TruthSetupService.ImportReport> ImportCore(World w)
+    {
+        var svc = new FakePdfImports(w.Db, w.Parser, new BenefitsAndGovernanceTests.MemoryStorage(), w.Setup);
+        object staged;
+        try { staged = await svc.StageAsync(w.GroupId, new MemoryStream(FakePdf()), "statement.pdf", w.Treasurer); }
+        catch (ConflictException ex) when (ex.Message.StartsWith("Hakuna muamala mpya"))
+        {
+            var n = w.Parser.Rows.Select(r => r.ReferenceNumber).Distinct().Count();
+            return new TruthSetupService.ImportReport("", n, 0, n, new(), new(), 0, 0, null, null, null, new(), new());
+        }
+        var id = (Guid)staged.GetType().GetProperty("Id")!.GetValue(staged)!;
+        // aliyepakia hawezi kuidhinisha
+        await Assert.ThrowsAsync<ForbiddenException>(() => svc.ApproveAsync(w.GroupId, id, null, w.Treasurer));
+        return (await svc.ApproveAsync(w.GroupId, id, "nimehakiki", w.Chair)).Report;
+    }
 
     [Fact]
     public async Task FullFlow_Reset_Import_Phones_ManualJoinFee_MatchesLeadersExcel()
@@ -132,12 +187,22 @@ public class TruthLedgerServiceTests
         var before = await w.Truth.GetMemberTruthAsync(w.Frank, new DateTime(2026, 9, 25, 12, 0, 0));
         Assert.Equal(0m, before.Statement.TotalAccepted);
         Assert.NotEmpty(before.Warnings);
+        // SASISHO16: ilani yenye code thabiti (frontend inatafsiri kwa kiolezo) — si maandishi ya ndani
+        var phoneNotice = Assert.Single(before.Notices, n => n.Code == "NO_APPROVED_PHONE");
+        Assert.Equal(TruthLedgerService.TruthNotice.KindDataQuality, phoneNotice.Kind);
+        Assert.False(string.IsNullOrWhiteSpace(phoneNotice.Tpl));
 
         // 4. Viongozi wanaweka namba (mfumo wowote wa kuandika unakubalika)
         var p1 = await w.Setup.AddPhoneAsync(w.GroupId, w.Frank, "0712 805 984", w.Treasurer, null);
         Assert.True(p1.MatchedInMkoba);
         Assert.Equal("FRANK MKOMA", p1.MkobaNameSeen);
-        await w.Setup.AddPhoneAsync(w.GroupId, w.Tunganege, "+255742674429", w.Treasurer, null);
+        Assert.Equal(TruthApprovalStatus.Pending, p1.Phone.Status);
+        var notYet = await w.Truth.GetMemberTruthAsync(w.Frank, new DateTime(2026, 9, 25, 12, 0, 0));
+        Assert.Equal(0m, notYet.Statement.TotalAccepted);                                  // bado haijaidhinishwa -> haihesabiwi
+        await Assert.ThrowsAsync<ForbiddenException>(() =>
+            w.Setup.DecidePhoneAsync(w.GroupId, p1.Phone.Id, true, w.Treasurer, null));    // aliyeomba hawezi kuidhinisha
+        await w.Setup.DecidePhoneAsync(w.GroupId, p1.Phone.Id, true, w.Chair, null);
+        await Link(w, w.Tunganege, "+255742674429");
         await Assert.ThrowsAsync<ConflictException>(() =>
             w.Setup.AddPhoneAsync(w.GroupId, w.Tunganege, "255712805984", w.Treasurer, null)); // namba moja = mtu mmoja
 
@@ -194,7 +259,7 @@ public class TruthLedgerServiceTests
         var w = await Build();
         w.Parser.Rows = PdfRows(withMissingRow: false);
         await Import(w);
-        await w.Setup.AddPhoneAsync(w.GroupId, w.Frank, "255712805984", w.Treasurer, null);
+        await Link(w, w.Frank, "255712805984");
         var gap = await w.Db.MkobaStatementGaps.SingleAsync();
 
         await w.Setup.RequestGapResolutionAsync(w.GroupId, gap.Id, w.Frank, "SMS ya M-Koba ya Frank, ref DD1XXXX", w.Treasurer);
@@ -211,7 +276,7 @@ public class TruthLedgerServiceTests
         var w = await Build();
         w.Parser.Rows = PdfRows(withMissingRow: false);
         await Import(w);
-        await w.Setup.AddPhoneAsync(w.GroupId, w.Tunganege, "255742674429", w.Treasurer, null);
+        await Link(w, w.Tunganege, "255742674429");
         var asOf = new DateTime(2026, 9, 25, 12, 0, 0);
 
         var a = await w.Setup.RequestAdjustmentAsync(w.GroupId, w.Tunganege, TruthAdjustmentKind.FineWaiver, 2026, 5, 0, "Msiba wa familia", w.Treasurer);
@@ -231,8 +296,8 @@ public class TruthLedgerServiceTests
         var w = await Build();
         w.Parser.Rows = PdfRows(withMissingRow: false).Where(r => r.TransactionDate < new DateTime(2026, 8, 2)).ToList();
         await Import(w);
-        await w.Setup.AddPhoneAsync(w.GroupId, w.Frank, "255712805984", w.Treasurer, null);
-        await w.Setup.AddPhoneAsync(w.GroupId, w.Tunganege, "255742674429", w.Treasurer, null);
+        await Link(w, w.Frank, "255712805984");
+        await Link(w, w.Tunganege, "255742674429");
         var asOf = new DateTime(2026, 9, 25, 22, 0, 0);
 
         var f = (await w.Truth.GetMemberTruthAsync(w.Frank, asOf)).Statement;
@@ -258,7 +323,7 @@ public class TruthLedgerServiceTests
         var w = await Build();
         w.Parser.Rows = PdfRows(withMissingRow: false);
         await Import(w);
-        await w.Setup.AddPhoneAsync(w.GroupId, w.Frank, "255712805984", w.Treasurer, null);
+        await Link(w, w.Frank, "255712805984");
 
         var p = await w.Setup.PreviewManualPaymentAsync(w.GroupId, w.Frank, 10_000m, new DateTime(2026, 3, 15), true);
         Assert.True(p.Valid);
@@ -307,8 +372,8 @@ public class TruthLedgerServiceTests
         var w = await Build();
         w.Parser.Rows = PdfRows(withMissingRow: true);
         await Import(w);
-        await w.Setup.AddPhoneAsync(w.GroupId, w.Frank, "255712805984", w.Treasurer, null);
-        await w.Setup.AddPhoneAsync(w.GroupId, w.Tunganege, "255742674429", w.Treasurer, null);
+        await Link(w, w.Frank, "255712805984");
+        await Link(w, w.Tunganege, "255742674429");
         return w;
     }
 
@@ -423,8 +488,10 @@ public class TruthLedgerServiceTests
         w.Db.Groups.Add(new Group { Id = fresh, Name = "Kikundi kipya" });
         await w.Db.SaveChangesAsync();
 
-        var ex = await Assert.ThrowsAsync<ArgumentException>(() => w.Setup.UpdateSettingsAsync(fresh,
+        // SASISHO17: ValidationException yenye kiolezo (Template) kinachotafsirika kwa EN
+        var ex = await Assert.ThrowsAsync<ChamaLink.Domain.Exceptions.ValidationException>(() => w.Setup.UpdateSettingsAsync(fresh,
             new TruthSetupService.SettingsDto { ContributionStartDate = new DateTime(2026, 1, 1) }, w.Chair));
+        Assert.Equal("Mipangilio ya kwanza haijakamilika. Weka: {0}.", ex.Template);
         Assert.Contains("MonthlyContribution", ex.Message);
         Assert.Contains("LateFine", ex.Message);
         Assert.Contains("JoiningFee", ex.Message);
@@ -540,7 +607,10 @@ public class TruthLedgerServiceTests
 
         var frank = r.Members.Single(m => m.MemberId == w.Frank);
         Assert.Equal(("Unpaid", 10_000m, 0m, 5_000m, 15_000m), (frank.Status, frank.Target, frank.Paid, frank.FineCharged, frank.Outstanding));
-        Assert.Equal(30_000m, frank.TotalArrears);     // Julai + Agosti
+        // "Deni lote" ni la LEO (si la Julai): Julai + Agosti = 30,000 + kila mwezi uliopita tangu hapo (jaribio halitegemei tarehe)
+        var frankNow = await w.Truth.GetMemberTruthAsync(w.Frank, null);
+        Assert.True(frank.TotalArrears >= 30_000m);
+        Assert.Equal(frankNow.Statement.Arrears, frank.TotalArrears);
         Assert.Equal(50_000m, frank.JoinFeeOutstanding);
 
         var tung = r.Members.Single(m => m.MemberId == w.Tunganege);
@@ -554,7 +624,7 @@ public class TruthLedgerServiceTests
         Assert.Contains("TAARIFA YA MCHANGO — JULAI 2026", r.WhatsAppText);
         Assert.Contains("14 | Frank Mkoma | 0712***984", r.WhatsAppText);
         Assert.Contains("❌ Hajalipa | Faini: 5,000 | Deni la mwezi: 15,000", r.WhatsAppText);
-        Assert.Contains("deni lote la michango 30,000, kianzio 50,000", r.WhatsAppText);
+        Assert.Contains(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"deni lote la michango {frank.TotalArrears:N0}, kianzio 50,000"), r.WhatsAppText);
         Assert.Contains("22 | Tunganege | 0742***429", r.WhatsAppText);
         Assert.DoesNotContain("255712805984", r.WhatsAppText);  // namba kamili haisambazwi kwenye kundi
     }
@@ -581,7 +651,7 @@ public class TruthLedgerServiceTests
     public async Task GapMessage_NamesBothBoundaryRows_ShowsBalances_AndWarnsOnImport()
     {
         var w = await Build();
-        await w.Setup.AddPhoneAsync(w.GroupId, w.Frank, "0712805984", w.Treasurer, null);
+        await Link(w, w.Frank, "0712805984");
         w.Parser.Rows = PdfRows(withMissingRow: false);
         var imp = await Import(w);
 

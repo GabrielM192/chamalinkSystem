@@ -29,9 +29,7 @@ public class WithdrawalService
 
     public async Task<Withdrawal> CreateAsync(CreateWithdrawalDto dto, Guid actorUserId)
     {
-        var recordedBy = await _context.GroupMembers
-            .FirstOrDefaultAsync(m => m.UserId == actorUserId && m.GroupId == dto.GroupId)
-            ?? throw new UnauthorizedAccessException("Wewe si mwanachama wa kikundi hiki.");
+        var recordedBy = await Services.Common.MemberAccess.RequireActiveAsync(_context, dto.GroupId, actorUserId, default); // SASISHO17: hai tu
 
         // If this withdrawal is settling a specific event and no explicit
         // beneficiary was given, default to that event's own beneficiary
@@ -83,9 +81,13 @@ public class WithdrawalService
         if (withdrawal.Status != WithdrawalStatus.Pending && withdrawal.Status != WithdrawalStatus.PartiallyApproved)
             throw new ConflictException("Withdrawal hii tayari imeshughulikiwa (imeshaidhinishwa, kukataliwa, au kulipwa).");
 
-        var decidingMember = await _context.GroupMembers
-            .FirstOrDefaultAsync(m => m.UserId == actorUserId && m.GroupId == withdrawal.GroupId)
-            ?? throw new UnauthorizedAccessException("Wewe si mwanachama wa kikundi hiki.");
+        var decidingMember = await Services.Common.MemberAccess.RequireActiveAsync(_context, withdrawal.GroupId, actorUserId, default); // SASISHO17: hai tu
+
+        // Maker-checker: aliyeandika ombi la kutoa pesa hawezi kuliidhinisha; mnufaika pia hawezi.
+        if (withdrawal.RecordedByGroupMemberId == decidingMember.Id)
+            throw new ForbiddenException("Aliyeandika ombi la kutoa pesa HAWEZI kuliidhinisha mwenyewe.");
+        if (withdrawal.BeneficiaryGroupMemberId == decidingMember.Id)
+            throw new ForbiddenException("Mnufaika hawezi kuidhinisha malipo yake mwenyewe.");
 
         if (withdrawal.Approvals.Any(a => a.GroupMemberId == decidingMember.Id))
             throw new ValidationException("Tayari umeshatoa uamuzi kwenye withdrawal hii.");
@@ -148,12 +150,13 @@ public class WithdrawalService
     {
         var withdrawal = await GetOrThrowAsync(withdrawalId);
 
-        var actor = await _context.GroupMembers
-            .FirstOrDefaultAsync(m => m.UserId == actorUserId && m.GroupId == withdrawal.GroupId)
-            ?? throw new UnauthorizedAccessException("Wewe si mwanachama wa kikundi hiki.");
+        var actor = await Services.Common.MemberAccess.RequireActiveAsync(_context, withdrawal.GroupId, actorUserId, default); // SASISHO17: hai tu
 
-        if (actor.Role != GroupRole.Treasurer)
+        if (Services.Common.MemberAccess.EffectiveRole(actor) != GroupRole.Treasurer)
             throw new UnauthorizedAccessException("Mtunza Hazina (Treasurer) pekee ndiye anaweza kuthibitisha malipo.");
+
+        if (withdrawal.BeneficiaryGroupMemberId == actor.Id)
+            throw new ForbiddenException("Mnufaika hawezi kuthibitisha malipo yake mwenyewe.");
 
         if (withdrawal.Status != WithdrawalStatus.Approved)
             throw new ValidationException("Withdrawal lazima iidhinishwe kikamilifu kwanza kabla ya kuwekwa kama imelipwa.");

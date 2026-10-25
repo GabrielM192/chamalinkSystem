@@ -1,12 +1,14 @@
 using ChamaLink.API.Extensions;
 using ChamaLink.Domain;
 using ChamaLink.Domain.Entities;
+using ChamaLink.Domain.Exceptions;
 using ChamaLink.Domain.Ledger;
 using ChamaLink.Infrastructure;
 using ChamaLink.Infrastructure.Services;
 using ChamaLink.Infrastructure.Services.Truth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChamaLink.API.Controllers;
@@ -31,10 +33,17 @@ public class TruthController : ControllerBase
     private readonly TruthSetupService _setup;
     private readonly GroupAuthorizationService _groupAuth;
     private readonly ApplicationDbContext _context;
+    private readonly IConfiguration _config;
+    private readonly ResetRequestService _reset;
+    private readonly StatementImportService _imports;
 
     public TruthController(TruthLedgerService truth, TruthSetupService setup, GroupAuthorizationService groupAuth,
-        ApplicationDbContext context)
+        ApplicationDbContext context, IConfiguration config, ResetRequestService reset,
+        StatementImportService imports)
     {
+        _imports = imports;
+        _config = config;
+        _reset = reset;
         _truth = truth;
         _setup = setup;
         _groupAuth = groupAuth;
@@ -42,17 +51,30 @@ public class TruthController : ControllerBase
     }
 
     // ============================ KUSOMA ============================
+    private const string MemberForbidden = "Huna ruhusa ya kuona taarifa hii.";
 
     /// <summary>GET /api/truth/member/{memberId}?asOf=2026-08-05T23:59:59 (saa za EAT)</summary>
     [HttpGet("member/{memberId:guid}")]
     public async Task<IActionResult> Member(Guid memberId, [FromQuery] DateTime? asOf, CancellationToken ct)
     {
         var groupId = await _context.GroupMembers.Where(m => m.Id == memberId).Select(m => (Guid?)m.GroupId).FirstOrDefaultAsync(ct);
-        if (groupId is null) return NotFound();
-        // Mwanachama anaona taarifa YAKE tu; viongozi wanaona ya kila mwanachama
-        var me = await _groupAuth.RequireMembershipAsync(User.GetUserId(), groupId.Value);
-        if (me.Id != memberId) await _groupAuth.RequireRoleAsync(User.GetUserId(), groupId.Value, Leaders);
-        return Ok(ToDto(await _truth.GetMemberTruthAsync(memberId, asOf, ct), includeAllocations: true));
+        // SASISHO17 (NEW-8): memberId isiyokuwepo = jibu lilelile la "huna ruhusa" (haifichui kama GUID ipo)
+        if (groupId is null) throw new ChamaLink.Domain.Exceptions.ForbiddenException(MemberForbidden);
+        // Mwanachama anaona taarifa YAKE tu (hata kama ametoka — hesabu yake ya mwisho); viongozi HAI wanaona ya kila mwanachama
+        // GUID ya kikundi kingine / ya mwanachama mwingine bila ruhusa → ujumbe ULE ULE (hakuna tofauti ya kuchunguza)
+        bool viewerIsLeader;
+        try
+        {
+            var me = await _groupAuth.RequireOwnRecordAsync(User.GetUserId(), groupId.Value);
+            if (me.Id != memberId)
+            {
+                await _groupAuth.RequireRoleAsync(User.GetUserId(), groupId.Value, Leaders);
+                viewerIsLeader = true;
+            }
+            else viewerIsLeader = ChamaLink.Infrastructure.Services.Common.MemberAccess.IsEffectiveLeader(me);
+        }
+        catch (ChamaLink.Domain.Exceptions.ForbiddenException) { throw new ChamaLink.Domain.Exceptions.ForbiddenException(MemberForbidden); }
+        return Ok(ToDto(await _truth.GetMemberTruthAsync(memberId, asOf, ct), includeAllocations: true, viewerIsLeader: viewerIsLeader));
     }
 
     /// <summary>GET /api/truth/group/{groupId}?asOf=... — jedwali linalolingana na Excel ya mtunza-hazina.</summary>
@@ -66,11 +88,13 @@ public class TruthController : ControllerBase
         {
             groupId,
             asOf = all.FirstOrDefault()?.Statement.AsOf,
-            members = all.Select(t => ToDto(t, includeAllocations: false)),
+            members = all.Select(t => ToDto(t, includeAllocations: false, viewerIsLeader: true)),
             totals = new
             {
                 acceptedFromMkoba = all.Sum(t => t.Statement.TotalAcceptedFromMkoba),
-                acceptedManual = all.Sum(t => t.Statement.TotalAcceptedManual),
+                acceptedManual = all.Sum(t => t.Statement.TotalAcceptedManual - t.Statement.TotalWelfareOffset),
+                welfareOffset = all.Sum(t => t.Statement.TotalWelfareOffset),
+                finesWaivedAmount = all.Sum(t => t.Statement.FinesWaivedAmount),
                 contributionPaid = all.Sum(t => t.Statement.TotalContributionPaid),
                 finePaid = all.Sum(t => t.Statement.TotalFinePaid),
                 joinFeePaid = all.Sum(t => t.Statement.JoinFeePaid),
@@ -126,8 +150,9 @@ public class TruthController : ControllerBase
     [HttpGet("{groupId:guid}/me")]
     public async Task<IActionResult> Me(Guid groupId, CancellationToken ct)
     {
-        var me = await _groupAuth.RequireMembershipAsync(User.GetUserId(), groupId);
-        return Ok(ToDto(await _truth.GetMemberTruthAsync(me.Id, null, ct), includeAllocations: true));
+        var me = await _groupAuth.RequireOwnRecordAsync(User.GetUserId(), groupId); // SASISHO17: taarifa yako tu, hali yoyote
+        return Ok(ToDto(await _truth.GetMemberTruthAsync(me.Id, null, ct), includeAllocations: true,
+            viewerIsLeader: ChamaLink.Infrastructure.Services.Common.MemberAccess.IsEffectiveLeader(me)));
     }
 
     /// <summary>GET /api/truth/{groupId}/members — orodha nyepesi ya wanachama (kwa fomu/uchaguzi).</summary>
@@ -135,7 +160,9 @@ public class TruthController : ControllerBase
     public async Task<IActionResult> Members(Guid groupId, CancellationToken ct)
     {
         await _groupAuth.RequireRoleAsync(User.GetUserId(), groupId, Leaders); // taarifa za wanachama wote = viongozi tu
-        var phones = await _context.MemberPhones.Where(p => p.GroupId == groupId)
+        // Namba zinazohesabu malipo pekee (zimeidhinishwa na hazijafungwa) — nyingine hazimfanyi mtu "ana simu"
+        var phones = await _context.MemberPhones.Where(p => p.GroupId == groupId
+                && p.Status == TruthApprovalStatus.Approved && p.ValidTo == null)
             .Select(p => new { p.GroupMemberId, p.Phone }).ToListAsync(ct);
         var members = await _context.GroupMembers.Include(m => m.User).Where(m => m.GroupId == groupId).ToListAsync(ct);
         return Ok(members
@@ -150,16 +177,9 @@ public class TruthController : ControllerBase
             }));
     }
 
-    /// <summary>Msiba/Sherehe: kiasi halisi cha kumlipa mwanachama baada ya kukata deni la Kianzio.</summary>
-    [HttpGet("member/{memberId:guid}/welfare-deduction")]
-    public async Task<IActionResult> WelfareDeduction(Guid memberId, [FromQuery] decimal amount, [FromQuery] bool alsoDeductArrears, CancellationToken ct)
-    {
-        var groupId = await _context.GroupMembers.Where(m => m.Id == memberId).Select(m => (Guid?)m.GroupId).FirstOrDefaultAsync(ct);
-        if (groupId is null) return NotFound();
-        await _groupAuth.RequireRoleAsync(User.GetUserId(), groupId.Value, Leaders);
-        var t = await _truth.GetMemberTruthAsync(memberId, null, ct);
-        return Ok(WelfareDeductionRule.Compute(amount, t.Statement, alsoDeductArrears));
-    }
+    // SASISHO16: "welfare-deduction" (kikokotoo cha msiba/sherehe kwa kiasi chochote) IMEONDOLEWA. Ilikuwa njia ya
+    // pili ya hesabu ya mafao, tofauti na kesi rasmi (BenefitService: sera → kiwango × wanaohesabiwa → makato →
+    // kiasi halisi, kinachofungwa kura zinapoanza). Hesabu ya mafao sasa ina njia MOJA tu.
 
     // ============================ KUANDIKA (viongozi) ============================
 
@@ -171,10 +191,20 @@ public class TruthController : ControllerBase
         if (p is null) return NotFound(new { error = "Mipangilio bado haijawekwa. Tumia PUT /api/truth/{groupId}/settings." });
         return Ok(new
         {
-            p.MonthlyContribution, p.LateFine, p.JoiningFee, p.DueDateDay, p.GracePeriodDays,
+            p.MonthlyContribution, p.LateFine, p.LateFinePercent, lateFineMode = p.LateFinePercent is null ? "Fixed" : "Percent", p.JoiningFee, p.DueDateDay, p.GracePeriodDays,
             p.FineOnPartialPayment, p.AutoDeductSavings, p.ContributionStartDate, p.ManualEntryCutoff, p.FoundingMembersCutoff, p.LoanLatePenaltyAmount,
-            kanuni = $"Mchango wa mwezi M unatakiwa kufika tarehe {p.DueDateDay} ya mwezi M+1 saa {TruthPolicy.EndOfDay:hh\\:mm\\:ss}" +
-                     (p.GracePeriodDays > 0 ? $" + siku {p.GracePeriodDays} za neema." : " (hakuna siku za neema — faini kuanzia tarehe " + (p.DueDateDay + 1) + ").")
+            p.LoansEnabled, p.LoanInterestPercent, p.LoanRepaymentMonths, p.LoanMaxAmount, p.LoanMaxMultipleOfContributions, p.LoanMinMembershipMonths,
+            p.LoanAllowWithArrears, p.LoanAllowMultipleActive, p.LoanMinCashReserve, p.LoanRequiredApprovals, p.LoanApprovalValidDays,
+            p.RoleChangeApprovals, p.LeaderCoolingOffDays, p.CashStatementMaxAgeDays,
+            // SASISHO18 — sera ya vikundi vinavyochangishana KILA TUKIO
+            p.MemberMinimumBalance, p.EventTopUpWindowDays, p.OverdueEventFineAmount,
+            p.MaxEventDeductionPerMemberPerMonth, p.MaxEventsPerMonth, p.BeneficiaryContributes,
+            // SASISHO19 — kanuni za J3: faini -> neema -> hatari ya kuondolewa -> kurudi
+            p.EventFineGraceDays, p.RemovalApprovalsRequired, p.ReinstatementFineMultiplier, p.ReinstatementRequiresJoiningFee,
+            // S17: violezo KAMILI (si minyororo) ili vitafsirike; UI inajenga sentensi yenyewe kutoka DueDateDay/GracePeriodDays.
+            kanuni = p.GracePeriodDays > 0
+                ? $"Mchango wa mwezi M unatakiwa kufika tarehe {p.DueDateDay} ya mwezi M+1 saa {TruthPolicy.EndOfDay:hh\\:mm\\:ss} + siku {p.GracePeriodDays} za neema."
+                : $"Mchango wa mwezi M unatakiwa kufika tarehe {p.DueDateDay} ya mwezi M+1 saa {TruthPolicy.EndOfDay:hh\\:mm\\:ss} (hakuna siku za neema — faini kuanzia tarehe {p.DueDateDay + 1})."
         });
     }
 
@@ -182,39 +212,119 @@ public class TruthController : ControllerBase
     public async Task<IActionResult> PutSettings(Guid groupId, [FromBody] TruthSetupService.SettingsDto dto, CancellationToken ct)
     {
         var actor = await _groupAuth.RequireRoleAsync(User.GetUserId(), groupId, Leaders);
-        var p = await _setup.UpdateSettingsAsync(groupId, dto, User.GetUserId(), ct);
-        return Ok(new { p.GroupId, p.DueDateDay, p.GracePeriodDays, p.ContributionStartDate, p.ManualEntryCutoff, p.FineOnPartialPayment });
+        var r = await _setup.ProposeSettingsAsync(groupId, dto, User.GetUserId(), null, ct);
+        return Ok(new { applied = r.Applied, proposalId = r.ProposalId, ujumbe = r.Ujumbe });
+    }
+
+    /// <summary>GET /api/truth/{groupId}/settings/proposals — mapendekezo ya kubadilisha kanuni (viongozi).</summary>
+    [HttpGet("{groupId:guid}/settings/proposals")]
+    public async Task<IActionResult> SettingsProposals(Guid groupId, CancellationToken ct)
+    {
+        await _groupAuth.RequireRoleAsync(User.GetUserId(), groupId, Leaders);
+        return Ok(await _setup.SettingsProposalsAsync(groupId, User.GetUserId(), ct));
+    }
+
+    /// <summary>Kiongozi wa pili anaidhinisha/kukataa; aliyependekeza anaweza kughairi (approve=false).</summary>
+    [HttpPost("{groupId:guid}/settings/proposals/{proposalId:guid}/decide")]
+    public async Task<IActionResult> DecideSettings(Guid groupId, Guid proposalId, [FromBody] DecisionRequest req, CancellationToken ct)
+    {
+        await _groupAuth.RequireRoleAsync(User.GetUserId(), groupId, Leaders);
+        var p = await _setup.DecideSettingsAsync(groupId, proposalId, req.Approve, req.Note, User.GetUserId(), ct);
+        return Ok(new { p.Id, status = p.Status.ToString() });
     }
 
     /// <summary>
-    /// POST /api/truth/{groupId}/reset?dryRun=true  — kwanza angalia kitakachofutwa.
-    /// Kufuta kweli: dryRun=false&amp;confirm={JINA KAMILI LA KIKUNDI}. Chukua pg_dump KWANZA.
-    /// Haifuti: wanachama, watumiaji, policy, namba za simu, AuditEvents.
+    /// POST /api/truth/{groupId}/reset?dryRun=true — angalia kitakachofutwa (hakuna kinachofutwa).
+    /// SASISHO17 (P0-6): kufuta KWELI kunapitia ombi + idhini ya kiongozi wa pili (reset/requests). dryRun=false hapa inakataliwa.
     /// </summary>
     [HttpPost("{groupId:guid}/reset")]
-    public async Task<IActionResult> Reset(Guid groupId, [FromQuery] bool dryRun = true, [FromQuery] string? confirm = null,
-        [FromQuery] bool keepLoans = false, CancellationToken ct = default)
+    public async Task<IActionResult> Reset(Guid groupId, [FromQuery] bool dryRun = true, [FromQuery] bool keepLoans = false, CancellationToken ct = default)
     {
-        var actor = await _groupAuth.RequireRoleAsync(User.GetUserId(), groupId, GroupRole.Chairperson, GroupRole.Treasurer);
-        var group = await _context.Groups.FirstOrDefaultAsync(g => g.Id == groupId, ct);
-        if (group is null) return NotFound();
-        if (!dryRun && !string.Equals(confirm?.Trim(), group.Name.Trim(), StringComparison.Ordinal))
-            return BadRequest(new { error = $"Kuthibitisha, weka confirm=\"{group.Name}\" (jina kamili la kikundi)." });
-
-        var r = await _setup.ResetGroupFinancialDataAsync(groupId, dryRun, keepLoans, User.GetUserId(), ct);
-        return Ok(r);
+        await _groupAuth.RequireRoleAsync(User.GetUserId(), groupId, GroupRole.Chairperson, GroupRole.Treasurer);
+        if (!dryRun) throw new ValidationException("Kufuta data kunahitaji ombi la kiongozi mmoja na idhini ya kiongozi wa pili (Mipangilio → Kufuta data).");
+        return Ok(await _setup.ResetGroupFinancialDataAsync(groupId, true, keepLoans, User.GetUserId(), ct));
     }
 
-    /// <summary>POST /api/truth/{groupId}/import-mkoba (multipart: file) — huhifadhi data GHAFI tu + ripoti ya uadilifu.</summary>
+    public sealed record ResetRequestBody(bool KeepLoans, string? Confirm);
+    public sealed record ResetApproveBody(string? Confirm);
+
+    [HttpGet("{groupId:guid}/reset/requests")]
+    public async Task<IActionResult> ResetRequests(Guid groupId, CancellationToken ct)
+        => Ok(await _reset.ListAsync(groupId, User.GetUserId(), ct));
+
+    [HttpPost("{groupId:guid}/reset/requests")]
+    public async Task<IActionResult> RequestReset(Guid groupId, [FromBody] ResetRequestBody req, CancellationToken ct)
+    {
+        var r = await _reset.RequestAsync(groupId, req.KeepLoans, req.Confirm, User.GetUserId(), ct);
+        return Ok(new { r.Id, status = r.Status.ToString(), r.ExpiresAt });
+    }
+
+    [HttpPost("{groupId:guid}/reset/requests/{requestId:guid}/approve")]
+    public async Task<IActionResult> ApproveReset(Guid groupId, Guid requestId, [FromBody] ResetApproveBody req, CancellationToken ct)
+        => Ok(await _reset.ApproveAsync(groupId, requestId, req.Confirm, User.GetUserId(), ct));
+
+    [HttpPost("{groupId:guid}/reset/requests/{requestId:guid}/reject")]
+    public async Task<IActionResult> RejectReset(Guid groupId, Guid requestId, CancellationToken ct)
+    {
+        await _reset.CancelAsync(groupId, requestId, User.GetUserId(), ct);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// POST /api/truth/{groupId}/import-mkoba (multipart: file) — SASISHO17: inatengeneza RASIMU tu (haiingizi data).
+    /// Kiongozi wa pili anaidhinisha kwa POST mkoba-imports/{id}/approve.
+    /// </summary>
     [HttpPost("{groupId:guid}/import-mkoba")]
-    [RequestSizeLimit(20_000_000)]
+    [EnableRateLimiting("upload")]
+    [ChamaLink.API.Filters.ConfiguredRequestSizeLimit("Mkoba:MaxUploadBytes")] // SASISHO17 (P1-8): kutoka config
     public async Task<IActionResult> ImportMkoba(Guid groupId, IFormFile file, CancellationToken ct)
     {
-        var actor = await _groupAuth.RequireRoleAsync(User.GetUserId(), groupId, Leaders);
-        if (file is null || file.Length == 0) return BadRequest(new { error = "Weka faili la PDF la M-Koba." });
+        await _groupAuth.RequireRoleAsync(User.GetUserId(), groupId, Leaders);
+        if (file is null || file.Length == 0) throw new ValidationException("Weka faili la PDF la M-Koba.");
+        if (file.Length > _imports.MaxUploadBytes) throw new ValidationException($"Faili ni kubwa mno (kikomo ni MB {_imports.MaxUploadBytes / (1024 * 1024)}).");
         await using var s = file.OpenReadStream();
-        var r = await _setup.ImportMkobaStatementAsync(groupId, s, User.GetUserId(), ct);
-        return Ok(r);
+        return Ok(await _imports.StageAsync(groupId, s, file.FileName, User.GetUserId(), ct));
+    }
+
+    /// <summary>Kikomo cha nje cha ombi zima (ulinzi wa Kestrel); kikomo halisi cha faili ni Mkoba:MaxUploadBytes.</summary>
+
+    [HttpGet("{groupId:guid}/mkoba-imports")]
+    public async Task<IActionResult> MkobaImports(Guid groupId, CancellationToken ct)
+    {
+        await _groupAuth.RequireRoleAsync(User.GetUserId(), groupId, Leaders);
+        return Ok(await _imports.ListAsync(groupId, User.GetUserId(), ct));
+    }
+
+    [HttpGet("{groupId:guid}/mkoba-imports/{importId:guid}")]
+    public async Task<IActionResult> MkobaImport(Guid groupId, Guid importId, CancellationToken ct)
+    {
+        await _groupAuth.RequireRoleAsync(User.GetUserId(), groupId, Leaders);
+        return Ok(await _imports.GetAsync(groupId, importId, User.GetUserId(), ct));
+    }
+
+    [HttpGet("{groupId:guid}/mkoba-imports/{importId:guid}/file")]
+    public async Task<IActionResult> MkobaImportFile(Guid groupId, Guid importId, CancellationToken ct)
+    {
+        await _groupAuth.RequireRoleAsync(User.GetUserId(), groupId, Leaders);
+        var (bytes, name) = await _imports.FileAsync(groupId, importId, User.GetUserId(), ct);
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        return File(bytes, "application/pdf", name);
+    }
+
+    [HttpPost("{groupId:guid}/mkoba-imports/{importId:guid}/approve")]
+    public async Task<IActionResult> ApproveMkobaImport(Guid groupId, Guid importId, [FromBody] DecisionRequest? req, CancellationToken ct)
+    {
+        await _groupAuth.RequireRoleAsync(User.GetUserId(), groupId, Leaders);
+        return Ok(await _imports.ApproveAsync(groupId, importId, req?.Note, User.GetUserId(), ct));
+    }
+
+    /// <summary>Kiongozi mwingine anakataa (sababu lazima); aliyepakia anaghairi.</summary>
+    [HttpPost("{groupId:guid}/mkoba-imports/{importId:guid}/reject")]
+    public async Task<IActionResult> RejectMkobaImport(Guid groupId, Guid importId, [FromBody] DecisionRequest? req, CancellationToken ct)
+    {
+        await _groupAuth.RequireRoleAsync(User.GetUserId(), groupId, Leaders);
+        await _imports.RejectAsync(groupId, importId, req?.Note, User.GetUserId(), ct);
+        return NoContent();
     }
 
     // ---- Namba za simu ----
@@ -222,17 +332,44 @@ public class TruthController : ControllerBase
     public async Task<IActionResult> Phones(Guid groupId, CancellationToken ct)
     {
         await _groupAuth.RequireRoleAsync(User.GetUserId(), groupId, Leaders);
-        return Ok(await _setup.PhoneOverviewAsync(groupId, ct));
+        return Ok(await _setup.PhoneOverviewAsync(groupId, User.GetUserId(), ct));
     }
 
-    public sealed record AddPhoneRequest(Guid MemberId, string Phone, string? Note);
+    public sealed record AddPhoneRequest(Guid MemberId, string Phone, string? Note, DateTime? ValidFrom = null, DateTime? ValidTo = null);
+    public sealed record EndPhoneRequest(DateTime ValidTo, string Reason);
 
     [HttpPost("{groupId:guid}/phones")]
     public async Task<IActionResult> AddPhone(Guid groupId, [FromBody] AddPhoneRequest req, CancellationToken ct)
     {
         var actor = await _groupAuth.RequireRoleAsync(User.GetUserId(), groupId, Leaders);
-        var r = await _setup.AddPhoneAsync(groupId, req.MemberId, req.Phone, User.GetUserId(), req.Note, ct);
-        return Ok(new { phoneId = r.Phone.Id, phone = r.Phone.Phone, r.MatchedInMkoba, r.MkobaNameSeen, r.DepositsFound, r.DepositsTotal, r.Ujumbe });
+        var r = await _setup.AddPhoneAsync(groupId, req.MemberId, req.Phone, User.GetUserId(), req.Note, ct, req.ValidFrom, req.ValidTo);
+        return Ok(new { phoneId = r.Phone.Id, phone = r.Phone.Phone, status = r.Phone.Status.ToString(), r.MatchedInMkoba, r.MkobaNameSeen, r.DepositsFound, r.DepositsTotal, r.Ujumbe });
+    }
+
+    /// <summary>Kiongozi wa pili anaidhinisha/kukataa kuunganishwa kwa namba (maker-checker).</summary>
+    [HttpPost("{groupId:guid}/phones/{phoneId:guid}/decide")]
+    public async Task<IActionResult> DecidePhone(Guid groupId, Guid phoneId, [FromBody] DecisionRequest req, CancellationToken ct)
+    {
+        await _groupAuth.RequireRoleAsync(User.GetUserId(), groupId, Leaders);
+        var p = await _setup.DecidePhoneAsync(groupId, phoneId, req.Approve, User.GetUserId(), req.Note, ct);
+        return Ok(new { phoneId = p.Id, status = p.Status.ToString() });
+    }
+
+    /// <summary>Ombi la kufunga namba kuanzia tarehe (historia inabaki; malipo ya baadaye hayahesabiwi kwake).</summary>
+    [HttpPost("{groupId:guid}/phones/{phoneId:guid}/end")]
+    public async Task<IActionResult> EndPhone(Guid groupId, Guid phoneId, [FromBody] EndPhoneRequest req, CancellationToken ct)
+    {
+        await _groupAuth.RequireRoleAsync(User.GetUserId(), groupId, Leaders);
+        var p = await _setup.RequestEndPhoneAsync(groupId, phoneId, req.ValidTo, req.Reason, User.GetUserId(), ct);
+        return Ok(new { phoneId = p.Id, pendingValidTo = p.PendingValidTo });
+    }
+
+    [HttpPost("{groupId:guid}/phones/{phoneId:guid}/end/decide")]
+    public async Task<IActionResult> DecideEndPhone(Guid groupId, Guid phoneId, [FromBody] DecisionRequest req, CancellationToken ct)
+    {
+        await _groupAuth.RequireRoleAsync(User.GetUserId(), groupId, Leaders);
+        var p = await _setup.DecideEndPhoneAsync(groupId, phoneId, req.Approve, User.GetUserId(), req.Note, ct);
+        return Ok(new { phoneId = p.Id, validTo = p.ValidTo });
     }
 
     [HttpDelete("{groupId:guid}/phones/{phoneId:guid}")]
@@ -416,7 +553,12 @@ public class TruthController : ControllerBase
     }
 
 
-    private static object ToDto(TruthLedgerService.MemberTruth t, bool includeAllocations)
+    /// <param name="viewerIsLeader">
+    /// SASISHO16: mwanachama wa kawaida haoni taarifa za ubora wa data (dataQuality) wala sababu za ndani za
+    /// malipo yaliyokataliwa — hizo ni za viongozi kufanyia kazi.
+    /// </param>
+    [NonAction]
+    public static object ToDto(TruthLedgerService.MemberTruth t, bool includeAllocations, bool viewerIsLeader)
     {
         var s = t.Statement;
         return new
@@ -430,15 +572,20 @@ public class TruthController : ControllerBase
             totals = new
             {
                 acceptedFromMkoba = s.TotalAcceptedFromMkoba,
-                acceptedManual = s.TotalAcceptedManual,
+                // F-L3: makato ya mafao yana sehemu yake (welfareOffset); acceptedManual = malipo ya mkononi TU
+                acceptedManual = s.TotalAcceptedManual - s.TotalWelfareOffset,
                 contributionPaid = s.TotalContributionPaid,
                 fineCharged = s.TotalFineCharged,
                 finePaid = s.TotalFinePaid,
                 finesWaived = s.FinesWaivedCount,
+                finesWaivedAmount = s.FinesWaivedAmount,
                 joinFeeDue = s.JoinFeeDue,
                 joinFeePaid = s.JoinFeePaid,
                 joinFeeOutstanding = s.JoinFeeOutstanding,
                 loanRepaid = s.TotalLoanRepaid,
+                loanPenaltyPaid = s.TotalLoanPenaltyPaid,
+                welfareOffset = s.TotalWelfareOffset,
+                totalAccepted = s.TotalAccepted,
                 loanOutstanding = s.LoanOutstanding,
                 loanOverdue = s.LoanOverdue,
                 savings = s.Savings,
@@ -457,6 +604,7 @@ public class TruthController : ControllerBase
                 fineDue = p.FineDue,
                 finePaid = p.FinePaid,
                 fineWaived = p.FineWaived,
+                fineWaivedAmount = p.FineWaivedAmount,
                 extraGraceDays = p.ExtraGraceDays,
                 loanDue = p.LoanDue,
                 loanPaid = p.LoanPaid,
@@ -469,8 +617,12 @@ public class TruthController : ControllerBase
             allocations = includeAllocations
                 ? s.Allocations.Select(a => new { a.Reference, a.Timestamp, a.Target, period = a.Period?.Label, a.Amount, a.Explanation })
                 : null,
-            rejected = s.Rejected.Select(r => new { r.Payment.Reference, r.Payment.Timestamp, r.Payment.Amount, r.Reason }),
-            warnings = t.Warnings
+            rejected = viewerIsLeader
+                ? s.Rejected.Select(r => (object)new { r.Payment.Reference, r.Payment.Timestamp, r.Payment.Amount, r.Reason })
+                : Array.Empty<object>(),
+            notices = t.Notices.Where(n => viewerIsLeader || n.Kind == TruthLedgerService.TruthNotice.KindNotice)
+                .Select(n => new { n.Code, n.Kind, n.Message, n.Tpl, n.Args }),
+            warnings = t.Notices.Where(n => viewerIsLeader || n.Kind == TruthLedgerService.TruthNotice.KindNotice).Select(n => n.Message)
         };
     }
 }

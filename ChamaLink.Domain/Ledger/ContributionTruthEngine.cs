@@ -57,7 +57,10 @@ public enum PaymentPurpose
     /// <summary>Mfumo uamue kwa waterfall (default).</summary>
     Auto = 0,
     /// <summary>Pesa iliyotolewa kwa ajili ya Kianzio tu (manual / welfare offset).</summary>
-    JoinFee = 1
+    JoinFee = 1,
+    /// <summary>SASISHO14: makato ya deni la MICHANGO kwenye mafao — yanalipa mchango/faini (kongwe kwanza) TU,
+    /// hayagusi mkopo wala Kianzio kwanza (makato ya mkopo yana rejea yake tofauti).</summary>
+    Contributions = 2
 }
 
 public enum PeriodStatus
@@ -96,6 +99,8 @@ public sealed class TruthPolicy
 
     public required decimal MonthlyContribution { get; init; }
     public required decimal LateFine { get; init; }
+    /// <summary>Faini kama asilimia ya mchango wa kipindi (mf. 50). Ikiwa na thamani inachukua nafasi ya LateFine.</summary>
+    public decimal? LateFinePercent { get; init; }
     public required decimal JoiningFee { get; init; }
     /// <summary>Mchango wa mwezi M unatakiwa kufika tarehe hii ya mwezi M+1.</summary>
     public required int DueDay { get; init; }
@@ -113,18 +118,35 @@ public sealed class TruthPolicy
     /// <summary>Akiba ikatwe moja kwa moja deadline ikipita bila malipo.</summary>
     public required bool AutoDeductSavings { get; init; }
 
+    /// <summary>
+    /// SASISHO18: kikundi cha "kila tukio". Hakuna mchango wa mwezi, kwa hiyo
+    /// hakuna vipindi vya michango wala faini za mwezi — pesa iliyokubaliwa
+    /// yote ni AKIBA ya mwanachama (pochi yake), inayokatwa na matukio pekee.
+    /// </summary>
+    public bool IsEventBased { get; init; }
+
+    /// <summary>Faini ya kipindi: asilimia ya mchango (kama imewekwa) au kiasi maalum.</summary>
+    public decimal FineFor(decimal contributionDue) => LateFinePercent is { } pct
+        ? Math.Round(contributionDue * pct / 100m, 0, MidpointRounding.AwayFromZero)
+        : LateFine;
+
     public DateTime BaseDeadline(YearMonth p)
     {
         var n = p.Next();
-        int day = Math.Min(DueDay, DateTime.DaysInMonth(n.Year, n.Month));
+        // Kinga: hata kama sera ina DueDay=0 (kikundi cha matukio), hesabu isivunjike.
+        int day = Math.Clamp(DueDay, 1, Math.Min(28, DateTime.DaysInMonth(n.Year, n.Month)));
         return new DateTime(n.Year, n.Month, day).Add(DeadlineTimeOfDay).AddDays(GracePeriodDays);
     }
 
     public void Validate()
     {
-        if (MonthlyContribution <= 0) throw new InvalidOperationException("MonthlyContribution lazima iwe > 0");
+        // SASISHO18: kikundi cha "kila tukio" hakina mchango wa mwezi kabisa.
+        if (!IsEventBased && MonthlyContribution <= 0) throw new InvalidOperationException("MonthlyContribution lazima iwe > 0");
         if (LateFine < 0 || JoiningFee < 0 || LoanLatePenalty < 0) throw new InvalidOperationException("Viwango haviwezi kuwa hasi");
-        if (DueDay is < 1 or > 28) throw new InvalidOperationException("DueDay lazima iwe 1..28");
+        if (LateFinePercent is < 0 or > 100) throw new InvalidOperationException("LateFinePercent lazima iwe 0..100");
+        // SASISHO21: kikundi cha "kila tukio" hakina tarehe ya mwezi — DueDay=0 ni halali.
+        // (Ilizua hitilafu 500 kwenye ukurasa wa Muhtasari kwa kikundi cha matukio kilichowekwa bila mchango.)
+        if (!IsEventBased && DueDay is < 1 or > 28) throw new InvalidOperationException("DueDay lazima iwe 1..28");
         if (GracePeriodDays is < 0 or > 25) throw new InvalidOperationException("GracePeriodDays lazima iwe 0..25");
     }
 }
@@ -137,6 +159,11 @@ public sealed class TruthMember
     public required YearMonth FirstPeriod { get; init; }
     public bool JoinFeeRequiredUpfront { get; init; }
     public decimal? JoiningFeeOverride { get; init; }
+    /// <summary>
+    /// Mwanachama aliyejitoa/aliyefariki/aliyefukuzwa (imeidhinishwa na watu wengi): hakuna vipindi vipya
+    /// vinavyofunguka baada ya tarehe hii. Madeni ya kabla yanabaki. Null = bado ni mwanachama.
+    /// </summary>
+    public DateTime? ObligationsEndAt { get; init; }
 }
 
 public sealed record TruthPayment(
@@ -196,6 +223,8 @@ public sealed class PeriodLine
     public decimal CoveredBySavings { get; set; }
     public bool FineWaived { get; set; }
     public string? FineWaiverReason { get; set; }
+    /// <summary>Kiasi cha faini kilichosamehewa (0 kama msamaha upo lakini faini isingetozwa — mf. alilipa kwa wakati).</summary>
+    public decimal FineWaivedAmount { get; set; }
     public int ExtraGraceDays { get; set; }
     public bool WindowOpened { get; set; }
     public bool DeadlinePassed { get; set; }
@@ -254,11 +283,15 @@ public sealed class TruthStatement
     public decimal TotalAccepted { get; init; }
     public decimal TotalAcceptedFromMkoba { get; init; }
     public decimal TotalAcceptedManual { get; init; }
+    /// <summary>Sehemu ya TotalAcceptedManual iliyotokana na makato ya mafao (Kianzio/deni lililokatwa kwenye msiba/sherehe).</summary>
+    public decimal TotalWelfareOffset { get; init; }
 
     public decimal TotalContributionPaid => Periods.Sum(p => p.ContributionPaid);
     public decimal TotalFineCharged => Periods.Sum(p => p.FineDue);
     public decimal TotalFinePaid => Periods.Sum(p => p.FinePaid);
-    public int FinesWaivedCount => Periods.Count(p => p.FineWaived && p.DeadlinePassed);
+    /// <summary>Idadi ya faini zilizosamehewa KWELI (msamaha uliozuia faini). Kiasi: FinesWaivedAmount.</summary>
+    public int FinesWaivedCount => Periods.Count(p => p.FineWaivedAmount > 0);
+    public decimal FinesWaivedAmount => Periods.Sum(p => p.FineWaivedAmount);
     public decimal TotalLoanRepaid => Loans.Sum(l => l.Repaid);
     public decimal TotalLoanPenaltyPaid => Loans.Sum(l => l.PenaltyPaid);
     public decimal LoanOutstanding => Loans.Sum(l => l.Outstanding + Math.Max(0, l.PenaltyCharged - l.PenaltyPaid));
@@ -316,7 +349,8 @@ public static class ContributionTruthEngine
                     break;
                 case PaymentSource.WelfareOffset:
                     if (!p.IsApproved) { rejected.Add(new(p, "Makato ya msiba/sherehe hayajaidhinishwa")); continue; }
-                    if (p.Purpose != PaymentPurpose.JoinFee) { rejected.Add(new(p, "WelfareOffset lazima iwe Purpose=JoinFee")); continue; }
+                    // JoinFee = Kianzio kilichokatwa kwenye mafao; Auto = deni lililokatwa (linapita waterfall kamili)
+                    if (p.Purpose is not (PaymentPurpose.JoinFee or PaymentPurpose.Auto or PaymentPurpose.Contributions)) { rejected.Add(new(p, "WelfareOffset lazima iwe Purpose=JoinFee, Auto au Contributions")); continue; }
                     break;
                 case PaymentSource.MkobaGapResolved:
                     if (!p.IsApproved) { rejected.Add(new(p, "Pengo la M-Koba halijathibitishwa mwenyewe")); continue; }
@@ -329,13 +363,19 @@ public static class ContributionTruthEngine
         }
 
         // ---- 2. Vipindi + deadline za mwanachama huyu ----
+        // SASISHO18: kikundi cha "kila tukio" hakina vipindi vya mwezi.
+        // Pesa iliyokubaliwa yote inaingia akiba (pochi) na matukio pekee
+        // yanakata — hivyo hakuna periods, faini, wala Kianzio kinachodaiwa.
         var events = new List<(DateTime At, EvKind Kind, int Seq, object Item)>();
         int seq = 0;
         DateTime prevDeadline = DateTime.MinValue;
+        if (policy.IsEventBased) goto afterPeriods;
+
         for (var ym = firstPeriod; ; ym = ym.Next())
         {
             var opens = ym == firstPeriod ? new DateTime(ym.Year, ym.Month, 1) : prevDeadline.AddSeconds(1);
             if (opens > asOf) break;
+            if (member.ObligationsEndAt is { } end && opens > end) break;
             int extra = adj.Where(a => a.Kind == AdjustmentKind.GraceExtension && a.Period == ym).Select(a => a.ExtraDays).DefaultIfEmpty(0).Max();
             var waiver = adj.FirstOrDefault(a => a.Kind == AdjustmentKind.FineWaiver && a.Period == ym);
             var line = new PeriodLine
@@ -352,6 +392,8 @@ public static class ContributionTruthEngine
             if (line.Deadline <= asOf) events.Add((line.Deadline, EvKind.Deadline, seq++, line));
             prevDeadline = line.Deadline;
         }
+
+    afterPeriods:
 
         // ---- 3. Mikopo: weka marejesho kwenye vipindi ----
         var loanLines = new List<LoanLine>();
@@ -399,13 +441,17 @@ public static class ContributionTruthEngine
                     // b) Faini
                     bool unpaid = line.ContributionOutstanding > 0;
                     bool paidNothing = line.ContributionPaid == 0;
-                    if (unpaid && (policy.FineOnPartialPayment || paidNothing) && policy.LateFine > 0)
+                    var fine = policy.FineFor(line.ContributionDue);
+                    if (unpaid && (policy.FineOnPartialPayment || paidNothing) && fine > 0)
                     {
                         if (line.FineWaived)
+                        {
+                            line.FineWaivedAmount = fine;
                             allocations.Add(new($"WAIVER-{line.Period}", ev.At, "FineWaived", line.Period, 0m,
                                 $"Faini ya {line.Period.Label} imesamehewa na viongozi: {line.FineWaiverReason}"));
+                        }
                         else
-                            line.FineDue = policy.LateFine;
+                            line.FineDue = fine;
                     }
                     // c) Adhabu ya mkopo
                     if (policy.LoanLatePenalty > 0)
@@ -452,6 +498,7 @@ public static class ContributionTruthEngine
             TotalAccepted = accepted.Sum(p => p.Amount),
             TotalAcceptedFromMkoba = accepted.Where(p => p.Source is PaymentSource.Mkoba or PaymentSource.MkobaGapResolved).Sum(p => p.Amount),
             TotalAcceptedManual = accepted.Where(p => p.Source is PaymentSource.ManualHistorical or PaymentSource.WelfareOffset).Sum(p => p.Amount),
+            TotalWelfareOffset = accepted.Where(p => p.Source is PaymentSource.WelfareOffset).Sum(p => p.Amount),
         };
 
         if (stmt.InvariantDifference != 0)
@@ -468,12 +515,13 @@ public static class ContributionTruthEngine
             decimal remaining = amount;
 
             // 0) Kianzio kwanza (mwanachama mpya au Purpose=JoinFee)
-            if (purpose == PaymentPurpose.JoinFee || member.JoinFeeRequiredUpfront)
+            var contributionsOnly = purpose == PaymentPurpose.Contributions;
+            if (!contributionsOnly && (purpose == PaymentPurpose.JoinFee || member.JoinFeeRequiredUpfront))
                 remaining = PayJoinFee(remaining, reference, at, purpose == PaymentPurpose.JoinFee
                     ? $"{src}: imeelekezwa Kianzio" : $"{src}: mwanachama mpya — Kianzio kwanza");
 
             // 1) Rejesho la mkopo (vipindi vilivyofunguliwa, kongwe kwanza)
-            remaining = PayLoans(remaining, reference, at, src, onlyLine: null);
+            if (!contributionsOnly) remaining = PayLoans(remaining, reference, at, src, onlyLine: null);
 
             // 2) Mchango -> Faini, kongwe kwanza
             foreach (var line in periods.Where(l => l.WindowOpened))
@@ -529,7 +577,7 @@ public static class ContributionTruthEngine
                     instPaid[key] += a; inst.Line.LoanPaid += a; inst.Loan.Repaid += a; remaining -= a;
                     if (!inst.Line.PaidByReferences.Contains(reference)) inst.Line.PaidByReferences.Add(reference);
                     allocations.Add(new(reference, at, "LoanRepayment", inst.Line.Period, a,
-                        $"{src}: rejesho la mkopo {inst.Loan.LoanId} ({inst.Line.Period.Label})"));
+                        $"{src}: rejesho la mkopo wa {inst.Loan.DisbursedAt:dd/MM/yyyy} ({inst.Line.Period.Label})"));
                 }
                 if (remaining <= 0) break;
                 var pen = penDue[key];
@@ -561,12 +609,27 @@ public static class ContributionTruthEngine
 /// </summary>
 public static class WelfareDeductionRule
 {
-    public sealed record Result(decimal Approved, decimal JoinFeeDeducted, decimal ArrearsDeducted, decimal NetPayout);
+    public sealed record Result(decimal Approved, decimal JoinFeeDeducted, decimal ArrearsDeducted, decimal NetPayout, decimal LoanArrearsDeducted = 0m);
 
-    public static Result Compute(decimal approvedAmount, TruthStatement statement, bool alsoDeductArrears = false)
+    /// <summary>
+    /// SASISHO14: makato yaliyotenganishwa — Kianzio -> deni la michango (mchango+faini) -> deni la mkopo lililopitiliza.
+    /// Kila moja ni swichi ya sera. Invariant: Approved = JF + Arrears + Loan + Net.
+    /// </summary>
+    public static Result ComputeSplit(decimal approvedAmount, TruthStatement statement, bool deductJoinFee, bool deductContributionArrears, bool deductLoanArrears)
     {
         if (approvedAmount < 0) throw new ArgumentOutOfRangeException(nameof(approvedAmount));
-        var jf = Math.Min(approvedAmount, statement.JoinFeeOutstanding);
+        var jf = deductJoinFee ? Math.Min(approvedAmount, statement.JoinFeeOutstanding) : 0m;
+        var left = approvedAmount - jf;
+        var arr = deductContributionArrears ? Math.Min(left, statement.Arrears) : 0m;
+        left -= arr;
+        var loan = deductLoanArrears ? Math.Min(left, statement.LoanOverdue) : 0m;
+        return new Result(approvedAmount, jf, arr, left - loan, loan);
+    }
+
+    public static Result Compute(decimal approvedAmount, TruthStatement statement, bool alsoDeductArrears = false, bool deductJoinFee = true)
+    {
+        if (approvedAmount < 0) throw new ArgumentOutOfRangeException(nameof(approvedAmount));
+        var jf = deductJoinFee ? Math.Min(approvedAmount, statement.JoinFeeOutstanding) : 0m;
         var left = approvedAmount - jf;
         var arr = alsoDeductArrears ? Math.Min(left, statement.Arrears + statement.LoanOverdue) : 0m;
         return new Result(approvedAmount, jf, arr, left - arr);

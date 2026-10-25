@@ -1,4 +1,4 @@
-import { useGroupContext } from '../groups/GroupContext';
+import { useGroupContext } from '../groups/groupContextCore';
 import type { MyGroupSummary } from '../api/groups';
 
 interface UseMyGroupsResult {

@@ -479,7 +479,7 @@ public class TreasuryImportService
             }
 
             // Joining fee explicit column - prevent double-count (M-Koba already paid KIANZIO via waterfall)
-            // e.g., Tunganege paid 60k via M-Koba = 10k contrib + 50k KIANZIO. Excel KIANZIO 50k would double-count.
+            // mf. mwanachama alilipa 60k kwa M-Koba = 10k mchango + 50k KIANZIO; KIANZIO 50k ya Excel ingehesabiwa mara mbili.
             if (row.JoiningFee.HasValue && row.JoiningFee.Value > 0)
             {
                 // Check how much JoiningFee already paid according to queue (from M-Koba etc)
