@@ -78,6 +78,7 @@ export function TruthProvider({ children }: { children: (ctx: TruthCtx & { boote
             groupId: activeGroupId,
             groupName: activeGroup.groupName,
             role: activeGroup.role,
+            groupType: activeGroup.groupType,
             canReset: RESET_ROLES.has(activeGroup.role),
             members,
             settings,

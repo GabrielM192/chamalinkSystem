@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ChamaLink.API.Controllers;
 
-[LegacyEndpoint("Michango ya msiba/sherehe inaingia kupitia M-Koba; makato ya JoinFee: /api/truth/member/{memberId}/welfare-deduction")]
+[LegacyEndpoint("Mafao ya msiba/sherehe yanashughulikiwa kwenye ukurasa wa Mafao (kesi rasmi).")]
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]

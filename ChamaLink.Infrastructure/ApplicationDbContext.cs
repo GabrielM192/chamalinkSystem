@@ -6,6 +6,9 @@ namespace ChamaLink.Infrastructure;
 
 public class ApplicationDbContext : DbContext
 {
+    /// <summary>SASISHO21 — urefu wa kodi ya malipo (mf. "J3-E07-0147").</summary>
+    private const int PaymentCodeMaxLength = 20;
+
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
     {
     }
@@ -44,6 +47,9 @@ public class ApplicationDbContext : DbContext
     // NEW: Sprint 2 gap - see EventContribution.cs.
     public DbSet<EventContribution> EventContributions => Set<EventContribution>();
 
+    // SASISHO18: wajibu wa kila mwanachama kwa kila tukio (vikundi vya "kila tukio").
+    public DbSet<EventObligation> EventObligations => Set<EventObligation>();
+
     // NEW: Sprint 1 gap #18 - whole-statement duplicate import protection.
     public DbSet<ImportedStatement> ImportedStatements => Set<ImportedStatement>();
 
@@ -64,10 +70,42 @@ public class ApplicationDbContext : DbContext
     // Injini ya Ukweli (data ghafi tu)
     public DbSet<TruthGroupSettings> TruthGroupSettings => Set<TruthGroupSettings>();
     public DbSet<MkobaRawTransaction> MkobaRawTransactions => Set<MkobaRawTransaction>();
+    public DbSet<PaymentReceipt> PaymentReceipts => Set<PaymentReceipt>();
+    public DbSet<PaymentClaim> PaymentClaims => Set<PaymentClaim>();
+    public DbSet<SmsMessage> SmsMessages => Set<SmsMessage>();
+
+    // SASISHO21 — rufaa: mwanachama anapinga uamuzi; viongozi WAWILI wanaamua.
+    public DbSet<MemberAppeal> MemberAppeals => Set<MemberAppeal>();
+    public DbSet<MemberAppealVote> MemberAppealVotes => Set<MemberAppealVote>();
+    public DbSet<SmsAccount> SmsAccounts => Set<SmsAccount>();
     public DbSet<MemberPhone> MemberPhones => Set<MemberPhone>();
     public DbSet<MkobaStatementGap> MkobaStatementGaps => Set<MkobaStatementGap>();
     public DbSet<TruthAdjustmentRecord> TruthAdjustments => Set<TruthAdjustmentRecord>();
     public DbSet<MembershipRequest> MembershipRequests => Set<MembershipRequest>();
+    // Mafao + utawala wa watu wengi
+    public DbSet<BenefitGovernance> BenefitGovernances => Set<BenefitGovernance>();
+    public DbSet<BenefitRate> BenefitRates => Set<BenefitRate>();
+    public DbSet<BenefitCase> BenefitCases => Set<BenefitCase>();
+    public DbSet<BenefitEvidence> BenefitEvidence => Set<BenefitEvidence>();
+    public DbSet<GovernanceVote> GovernanceVotes => Set<GovernanceVote>();
+    public DbSet<MemberStatusChangeRequest> MemberStatusChangeRequests => Set<MemberStatusChangeRequest>();
+    // SASISHO20 — msimamizi wa mfumo (platform-wide, si nafasi ya kikundi)
+    public DbSet<PlatformAdmin> PlatformAdmins => Set<PlatformAdmin>();
+    public DbSet<PlatformAuditEvent> PlatformAuditEvents => Set<PlatformAuditEvent>();
+    public DbSet<PlatformApproval> PlatformApprovals => Set<PlatformApproval>();
+    public DbSet<PlatformPasswordResetCode> PlatformPasswordResetCodes => Set<PlatformPasswordResetCode>();
+    public DbSet<MkobaWithdrawalExplanation> MkobaWithdrawalExplanations => Set<MkobaWithdrawalExplanation>();
+    public DbSet<MemberNotification> MemberNotifications => Set<MemberNotification>();
+    public DbSet<MemberRelation> MemberRelations => Set<MemberRelation>();
+    public DbSet<BenefitLedgerEntry> BenefitLedgerEntries => Set<BenefitLedgerEntry>();
+    public DbSet<TruthSettingsProposal> TruthSettingsProposals => Set<TruthSettingsProposal>();
+    public DbSet<LoanApplication> LoanApplications => Set<LoanApplication>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    // SASISHO17
+    public DbSet<RoleChangeRequest> RoleChangeRequests => Set<RoleChangeRequest>();
+    public DbSet<MkobaStatementImport> MkobaStatementImports => Set<MkobaStatementImport>();
+    public DbSet<GroupResetRequest> GroupResetRequests => Set<GroupResetRequest>();
+    public DbSet<LoginFailure> LoginFailures => Set<LoginFailure>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -79,23 +117,316 @@ public class ApplicationDbContext : DbContext
             e.HasKey(x => x.GroupId);
             e.Property(x => x.MonthlyContribution).HasPrecision(18, 2);
             e.Property(x => x.LateFine).HasPrecision(18, 2);
+            e.Property(x => x.LateFinePercent).HasPrecision(5, 2);
             e.Property(x => x.JoiningFee).HasPrecision(18, 2);
             e.Property(x => x.LoanLatePenaltyAmount).HasPrecision(18, 2);
+            e.Property(x => x.LoanInterestPercent).HasPrecision(9, 4);
+            e.Property(x => x.LoanMaxAmount).HasPrecision(18, 2);
+            e.Property(x => x.LoanMaxMultipleOfContributions).HasPrecision(9, 4);
+            e.Property(x => x.LoanMinCashReserve).HasPrecision(18, 2);
+            // SASISHO18 — sera ya vikundi vya "kila tukio"
+            e.Property(x => x.MemberMinimumBalance).HasPrecision(18, 2);
+            e.Property(x => x.OverdueEventFineAmount).HasPrecision(18, 2);
+            e.Property(x => x.MaxEventDeductionPerMemberPerMonth).HasPrecision(18, 2);
+            // SASISHO19 — kanuni za J3: faini -> neema -> hatari ya kuondolewa -> kurudi
+            e.Property(x => x.ReinstatementFineMultiplier).HasPrecision(9, 2);
         });
         modelBuilder.Entity<MkobaRawTransaction>(e =>
         {
             e.HasIndex(x => new { x.GroupId, x.Reference }).IsUnique();   // muamala mmoja = mara moja tu
             e.HasIndex(x => new { x.GroupId, x.Phone });
+            e.HasIndex(x => new { x.GroupId, x.Timestamp });              // ukuaji: cashbook/ripoti kwa tarehe
             e.Property(x => x.Amount).HasPrecision(18, 2);
             e.Property(x => x.Balance).HasPrecision(18, 2);
             e.Property(x => x.Reference).HasMaxLength(40);
             e.Property(x => x.Phone).HasMaxLength(20);
+            e.Property(x => x.AttributionReason).HasMaxLength(300);
+            // SASISHO21: sanduku la malipo hupata amana zisizotambulika kwa kikundi.
+            e.HasIndex(x => new { x.GroupId, x.AttributedGroupMemberId });
+        });
+
+        // ---- SASISHO21: SANDUKU LA MALIPO (risiti + madai) ----
+        modelBuilder.Entity<PaymentReceipt>(e =>
+        {
+            e.HasIndex(x => new { x.GroupId, x.Status });
+            // Mstari mmoja wa statement = risiti moja tu (hakuna kuingiza mara mbili).
+            e.HasIndex(x => new { x.GroupId, x.MkobaTransactionId }).IsUnique()
+                .HasFilter("\"MkobaTransactionId\" IS NOT NULL");
+            e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Source).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.MatchRule).HasMaxLength(20);
+            e.Property(x => x.Reference).HasMaxLength(80);
+            e.Property(x => x.Phone).HasMaxLength(20);
+            e.Property(x => x.PaymentCodeSeen).HasMaxLength(20);
+            e.Property(x => x.PayerName).HasMaxLength(200);
+            e.Property(x => x.Description).HasMaxLength(400);
+            e.Property(x => x.Note).HasMaxLength(500);
+            // SASISHO21 (Sehemu ya 2): malipo ya kujiunga
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => new { x.GroupId, x.MembershipRequestId });
+        });
+
+        // ---- SASISHO21 (Sehemu ya 2): SMS ----
+        modelBuilder.Entity<SmsMessage>(e =>
+        {
+            e.HasIndex(x => new { x.GroupId, x.Status, x.SendAfter });
+        // ---------------------------------------------------------------
+        // SASISHO21 — RUFA
+        // ---------------------------------------------------------------
+        modelBuilder.Entity<MemberAppeal>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.GroupId, x.Status });
+            e.HasIndex(x => new { x.GroupId, x.GroupMemberId, x.Status });
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.HasOne<Group>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<GroupMember>().WithMany().HasForeignKey(x => x.GroupMemberId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<MemberAppealVote>(e =>
+        {
+            e.HasKey(x => x.Id);
+            // Kiongozi mmoja = kura MOJA kwa rufaa (haiwezi kupiga mara mbili)
+            e.HasIndex(x => new { x.AppealId, x.UserId }).IsUnique();
+            e.HasOne<MemberAppeal>().WithMany().HasForeignKey(x => x.AppealId).OnDelete(DeleteBehavior.Cascade);
+        });
+   // foleni ya kutuma
+            e.HasIndex(x => new { x.GroupId, x.CreatedAt });
+            e.HasIndex(x => x.ProviderReference);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Phone).HasMaxLength(20);
+            e.Property(x => x.TemplateKey).HasMaxLength(40);
+            e.Property(x => x.Body).HasMaxLength(360);
+            e.Property(x => x.ProviderReference).HasMaxLength(80);
+            e.Property(x => x.ProviderStatus).HasMaxLength(40);
+            e.Property(x => x.FailureReason).HasMaxLength(300);
+            e.Property(x => x.SuppressedReason).HasMaxLength(200);
+            e.Property(x => x.RelatedEntityType).HasMaxLength(40);
+        });
+
+        modelBuilder.Entity<SmsAccount>(e =>
+        {
+            e.HasKey(x => x.GroupId);
+        });
+
+        modelBuilder.Entity<PaymentClaim>(e =>
+        {
+            e.HasIndex(x => new { x.GroupId, x.Status });
+            e.HasIndex(x => new { x.GroupId, x.GroupMemberId });
+            // Namba ya muamala haiwezi kuombwa mara mbili kwenye kikundi kimoja.
+            e.HasIndex(x => new { x.GroupId, x.Reference }).IsUnique();
+            e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Reference).HasMaxLength(80);
+            e.Property(x => x.PaymentCode).HasMaxLength(20);
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.Property(x => x.DecisionNote).HasMaxLength(500);
         });
         modelBuilder.Entity<MemberPhone>(e =>
         {
-            e.HasIndex(x => new { x.GroupId, x.Phone }).IsUnique();       // namba moja = mwanachama mmoja
+            // Namba moja inaweza kuwa ya watu wawili kwa NYAKATI TOFAUTI (mf. ya Fauzia -> Abdulla hadi Juni).
+            // Kutopishana kwa vipindi kunakaguliwa na TruthSetupService.
+            e.HasIndex(x => new { x.GroupId, x.Phone });
             e.HasIndex(x => x.GroupMemberId);
             e.Property(x => x.Phone).HasMaxLength(20);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.PendingEndReason).HasMaxLength(500);
+        });
+
+        // ---- Mafao (msiba/sherehe) + utawala wa watu wengi ----
+        modelBuilder.Entity<BenefitGovernance>(e =>
+        {
+            e.HasIndex(x => new { x.GroupId, x.Status });
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.HeadcountRule).HasConversion<string>().HasMaxLength(40);
+            e.Property(x => x.FundingSource).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.Property(x => x.PaymentInitiatorRoles).HasMaxLength(60);
+            e.Property(x => x.PaymentConfirmerRoles).HasMaxLength(60);
+            e.Property(x => x.MaxBenefitAmountPerPeriod).HasPrecision(18, 2);
+            e.Property(x => x.HighValueThreshold).HasPrecision(18, 2);
+            e.Property(x => x.ConflictRelationTypes).HasMaxLength(60);
+            e.Property(x => x.ApproverRoles).HasMaxLength(60);
+            e.Property(x => x.EvidenceVerifierRoles).HasMaxLength(60);
+            e.Property(x => x.AuditorMemberIds).HasMaxLength(2000);
+            e.Property(x => x.HeadcountAsOf).HasConversion<string>().HasMaxLength(30);
+        });
+        modelBuilder.Entity<BenefitRate>(e =>
+        {
+            e.HasIndex(x => new { x.GroupId, x.Category, x.Relationship, x.EffectiveFrom });
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Category).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Relationship).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.PerMemberAmount).HasPrecision(18, 2);
+            e.Property(x => x.AcceptedEvidence).HasMaxLength(300);
+            e.Property(x => x.Note).HasMaxLength(500);
+        });
+        modelBuilder.Entity<BenefitCase>(e =>
+        {
+            e.HasIndex(x => new { x.GroupId, x.CaseNumber }).IsUnique();
+            e.HasIndex(x => new { x.GroupId, x.Status });
+            e.HasIndex(x => x.BeneficiaryGroupMemberId);
+            // Utoaji mmoja wa M-Koba unaeleza kesi MOJA tu
+            e.HasIndex(x => new { x.GroupId, x.MkobaReference }).IsUnique().HasFilter("\"MkobaReference\" IS NOT NULL");
+            e.Property(x => x.CaseNumber).HasMaxLength(40);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(40);
+            e.Property(x => x.Category).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Relationship).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.SubjectName).HasMaxLength(200);
+            e.Property(x => x.Description).HasMaxLength(1000);
+            e.Property(x => x.HeadcountRuleUsed).HasMaxLength(200);
+            // SASISHO15: kinga ya ushindani — maombi mawili yakibadilisha kesi moja kwa wakati mmoja, la pili linapata 409
+            e.Property<uint>("xmin").HasColumnType("xid").IsRowVersion();
+            e.Property(x => x.MkobaReference).HasMaxLength(40);
+            e.Property(x => x.ClosedReason).HasMaxLength(500);
+            e.Property(x => x.PaymentInitiatedToPhone).HasMaxLength(20);
+            e.Property(x => x.CashAvailableAtInitiation).HasPrecision(18, 2);
+            e.Property(x => x.LoanArrearsDeducted).HasPrecision(18, 2);
+            e.Property(x => x.PaymentChannel).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.CashRecipientName).HasMaxLength(200);
+            e.Property(x => x.CashRecipientPhone).HasMaxLength(20);
+            e.Property(x => x.ExceptionReason).HasMaxLength(500);
+            foreach (var n in new[] { nameof(BenefitCase.PerMemberAmount), nameof(BenefitCase.GrossAmount), nameof(BenefitCase.JoinFeeDeducted),
+                                       nameof(BenefitCase.ArrearsDeducted), nameof(BenefitCase.NetAmount) })
+                e.Property<decimal>(n).HasPrecision(18, 2);
+            e.HasMany(x => x.Evidence).WithOne().HasForeignKey(x => x.BenefitCaseId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<BenefitEvidence>(e =>
+        {
+            e.HasIndex(x => new { x.GroupId, x.Sha256 });
+            e.HasIndex(x => new { x.GroupId, x.DocumentType, x.DocumentNumber });
+            e.Property(x => x.DocumentType).HasConversion<string>().HasMaxLength(40);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.DocumentNumber).HasMaxLength(100);
+            e.Property(x => x.FileName).HasMaxLength(255);
+            e.Property(x => x.ContentType).HasMaxLength(100);
+            e.Property(x => x.Sha256).HasMaxLength(64);
+            e.Property(x => x.StorageKey).HasMaxLength(300);
+            e.Property(x => x.ReviewNote).HasMaxLength(500);
+        });
+        modelBuilder.Entity<GovernanceVote>(e =>
+        {
+            e.HasIndex(x => new { x.SubjectType, x.SubjectId, x.GroupMemberId }).IsUnique(); // kura moja kwa mtu
+            e.HasIndex(x => x.GroupId);
+            e.Property(x => x.SubjectType).HasMaxLength(40);
+            e.Property(x => x.RoleAtVote).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.Reason).HasMaxLength(500);
+        });
+        modelBuilder.Entity<MemberStatusChangeRequest>(e =>
+        {
+            e.HasIndex(x => new { x.GroupId, x.Status });
+            e.HasIndex(x => x.GroupMemberId);
+            e.Property(x => x.FromStatus).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.ToStatus).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Reason).HasMaxLength(500);
+            e.Property(x => x.EvidenceNote).HasMaxLength(500);
+        });
+        modelBuilder.Entity<MkobaWithdrawalExplanation>(e =>
+        {
+            e.HasIndex(x => new { x.GroupId, x.MkobaReference });
+            e.Property(x => x.MkobaReference).HasMaxLength(40);
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Description).HasMaxLength(500);
+            e.Property(x => x.DecisionNote).HasMaxLength(500);
+        });
+        modelBuilder.Entity<MemberNotification>(e =>
+        {
+            e.HasIndex(x => new { x.RecipientGroupMemberId, x.ReadAt });
+            e.Property(x => x.Kind).HasMaxLength(40);
+            e.Property(x => x.Title).HasMaxLength(200);
+            e.Property(x => x.Body).HasMaxLength(1000);
+            e.Property(x => x.Link).HasMaxLength(200);
+            e.Property(x => x.LocJson).HasMaxLength(4000);
+        });
+        modelBuilder.Entity<MemberRelation>(e =>
+        {
+            e.HasIndex(x => new { x.GroupId, x.Status });
+            e.HasIndex(x => x.MemberAId);
+            e.HasIndex(x => x.MemberBId);
+            e.Property(x => x.Type).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Note).HasMaxLength(300);
+            e.Property(x => x.EndReason).HasMaxLength(300);
+            e.Property(x => x.DecisionNote).HasMaxLength(300);
+        });
+        // ---- SASISHO15: maombi ya mikopo + refresh tokens ----
+        modelBuilder.Entity<LoanApplication>(e =>
+        {
+            e.HasIndex(x => new { x.GroupId, x.ApplicationNumber }).IsUnique();
+            e.HasIndex(x => new { x.GroupId, x.Status });
+            e.HasIndex(x => x.BorrowerGroupMemberId);
+            // Utoaji mmoja wa M-Koba unaeleza ombi MOJA tu
+            e.HasIndex(x => new { x.GroupId, x.MkobaReference }).IsUnique().HasFilter("\"MkobaReference\" IS NOT NULL");
+            e.Property(x => x.ApplicationNumber).HasMaxLength(40);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.Purpose).HasMaxLength(500);
+            e.Property(x => x.MkobaReference).HasMaxLength(60);
+            e.Property(x => x.RecipientNote).HasMaxLength(300);
+            e.Property(x => x.CloseReason).HasMaxLength(500);
+            e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.Property(x => x.InterestPercent).HasPrecision(9, 4);
+            e.Property(x => x.InterestAmount).HasPrecision(18, 2);
+            e.Ignore(x => x.TotalRepayable);
+            e.Property<uint>("xmin").HasColumnType("xid").IsRowVersion();
+        });
+        // ---- SASISHO17 ----
+        modelBuilder.Entity<RoleChangeRequest>(e =>
+        {
+            e.HasIndex(x => new { x.GroupId, x.Status });
+            e.Property(x => x.FromRole).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.ToRole).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Reason).HasMaxLength(500);
+            e.Property(x => x.DecisionNote).HasMaxLength(500);
+        });
+        modelBuilder.Entity<MkobaStatementImport>(e =>
+        {
+            e.HasIndex(x => new { x.GroupId, x.Status });
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.FileHash).HasMaxLength(80);
+            e.Property(x => x.FileName).HasMaxLength(200);
+            e.Property(x => x.StorageKey).HasMaxLength(200);
+            e.Property(x => x.DecisionNote).HasMaxLength(500);
+            e.Property(x => x.LastBalance).HasPrecision(18, 2);
+            e.Property<uint>("xmin").HasColumnType("xid").IsRowVersion();
+        });
+        modelBuilder.Entity<GroupResetRequest>(e =>
+        {
+            e.HasIndex(x => new { x.GroupId, x.Status });
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+        });
+        modelBuilder.Entity<LoginFailure>(e =>
+        {
+            e.HasIndex(x => new { x.UserId, x.IpKey }).IsUnique();
+            e.Property(x => x.IpKey).HasMaxLength(80);
+        });
+        modelBuilder.Entity<RefreshToken>(e =>
+        {
+            e.HasIndex(x => x.TokenHash).IsUnique();
+            e.HasIndex(x => new { x.UserId, x.FamilyId });
+            e.Property(x => x.TokenHash).HasMaxLength(100);
+            e.Property(x => x.CreatedByIp).HasMaxLength(64);
+        });
+        modelBuilder.Entity<BenefitLedgerEntry>(e =>
+        {
+            // Kila aina ya andiko mara MOJA kwa kesi (haliandikwi mara mbili)
+            e.HasIndex(x => new { x.BenefitCaseId, x.Kind }).IsUnique();
+            e.HasIndex(x => new { x.GroupId, x.BeneficiaryGroupMemberId });
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.Property(x => x.Reference).HasMaxLength(60);
+        });
+        modelBuilder.Entity<TruthSettingsProposal>(e =>
+        {
+            e.HasIndex(x => new { x.GroupId, x.Status });
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.PayloadJson).HasMaxLength(4000);
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.Property(x => x.DecisionNote).HasMaxLength(500);
         });
         modelBuilder.Entity<MkobaStatementGap>(e =>
         {
@@ -117,6 +448,12 @@ public class ApplicationDbContext : DbContext
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.Note).HasMaxLength(500);
             e.Property(x => x.DecisionNote).HasMaxLength(500);
+            // SASISHO21 (Sehemu ya 2): lango la kujiunga
+            e.Property(x => x.PaymentCode).HasMaxLength(20);
+            e.Property(x => x.PaymentAmount).HasPrecision(18, 2);
+            e.Property(x => x.PaymentReference).HasMaxLength(80);
+            e.HasIndex(x => new { x.GroupId, x.PaymentCode }).IsUnique()
+                .HasFilter("\"PaymentCode\" IS NOT NULL");
         });
         modelBuilder.Entity<Group>(e =>
         {
@@ -392,6 +729,9 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<Loan>().Property(l => l.AmountRepaid).HasPrecision(18, 2);
         modelBuilder.Entity<Loan>().Property(l => l.Status).HasConversion<string>();
         modelBuilder.Entity<Loan>().HasIndex(l => new { l.GroupId, l.Status });
+        modelBuilder.Entity<Loan>().Property(l => l.DisbursementReference).HasMaxLength(60);
+        modelBuilder.Entity<Loan>().Property(l => l.DefaultReason).HasMaxLength(500);
+        modelBuilder.Entity<Loan>().HasIndex(l => new { l.GroupId, l.DisbursementReference }).IsUnique().HasFilter("\"DisbursementReference\" IS NOT NULL");
         modelBuilder.Entity<Loan>()
             .HasOne(l => l.GroupMember)
             .WithMany()
@@ -469,6 +809,64 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<EventContribution>().Property(e => e.Status).HasConversion<string>();
         modelBuilder.Entity<EventContribution>()
             .HasIndex(e => new { e.GroupEventId, e.GroupMemberId }).IsUnique();
+
+        // SASISHO18 — wajibu wa kila mwanachama kwa kila tukio.
+        // UNIQUE(BenefitCaseId, GroupMemberId) ndiyo kinga kuu: tukio moja
+        // haliwezi kumkata mwanachama mara mbili, hata kama idhini itarudiwa.
+        modelBuilder.Entity<EventObligation>(o =>
+        {
+            o.Property(x => x.RequiredAmount).HasPrecision(18, 2);
+            o.Property(x => x.DeductedAmount).HasPrecision(18, 2);
+            o.Property(x => x.Status).HasConversion<string>();
+            o.Ignore(x => x.OutstandingAmount);
+            o.HasIndex(x => new { x.BenefitCaseId, x.GroupMemberId }).IsUnique();
+            o.HasIndex(x => new { x.GroupId, x.GroupMemberId, x.Status });
+            // SASISHO21 — kodi ya malipo: ya kipekee ndani ya kikundi (NULL nyingi huruhusiwa).
+            o.Property(x => x.PaymentCode).HasMaxLength(PaymentCodeMaxLength);
+            o.HasIndex(x => new { x.GroupId, x.PaymentCode }).IsUnique();
+            o.HasOne(x => x.Group).WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Cascade);
+            o.HasOne(x => x.GroupMember).WithMany().HasForeignKey(x => x.GroupMemberId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ================= SASISHO20 — msimamizi wa mfumo =================
+        modelBuilder.Entity<PlatformAdmin>(e =>
+        {
+            e.HasIndex(x => x.UserId).IsUnique();
+            e.Property(x => x.Level).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.TotpSecretProtected).HasMaxLength(400);
+            e.Property(x => x.PendingTotpSecretProtected).HasMaxLength(400);
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PlatformAuditEvent>(e =>
+        {
+            e.Property(x => x.Action).HasMaxLength(60);
+            e.Property(x => x.Reason).HasMaxLength(500);
+            e.Property(x => x.DetailJson).HasMaxLength(2000);
+            e.Property(x => x.Ip).HasMaxLength(64);
+            e.HasIndex(x => new { x.GroupId, x.At });
+            e.HasIndex(x => x.At);
+            e.HasIndex(x => new { x.PlatformAdminId, x.At });
+        });
+
+        modelBuilder.Entity<PlatformApproval>(e =>
+        {
+            e.Property(x => x.Action).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Reason).HasMaxLength(500);
+            e.Property(x => x.DecisionNote).HasMaxLength(500);
+            e.Property(x => x.PayloadJson).HasMaxLength(1000);
+            e.HasIndex(x => new { x.Status, x.Action });
+            e.HasIndex(x => new { x.GroupId, x.Status });
+        });
+
+        modelBuilder.Entity<PlatformPasswordResetCode>(e =>
+        {
+            e.Property(x => x.CodeHash).HasMaxLength(64);
+            e.Property(x => x.Salt).HasMaxLength(32);
+            e.HasIndex(x => new { x.UserId, x.UsedAt });
+            e.HasIndex(x => x.ExpiresAt);
+        });
 
         // NEW (Sprint 1 gap #18: whole-statement duplicate import protection)
         modelBuilder.Entity<ImportedStatement>()
@@ -591,6 +989,9 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<AuditEvent>().HasIndex(e => new { e.GroupId, e.MemberId });
         modelBuilder.Entity<AuditEvent>().HasIndex(e => e.CorrelationId);
         modelBuilder.Entity<AuditEvent>().HasIndex(e => e.Timestamp);
+        modelBuilder.Entity<AuditEvent>().HasIndex(e => new { e.GroupId, e.ChainIndex }).IsUnique().HasFilter("\"ChainIndex\" IS NOT NULL");
+        modelBuilder.Entity<AuditEvent>().Property(e => e.PrevHash).HasMaxLength(64);
+        modelBuilder.Entity<AuditEvent>().Property(e => e.Hash).HasMaxLength(64);
 
         modelBuilder.Entity<WelfareEvent>().Property(e => e.RequiredContributionPerMember).HasPrecision(18, 2);
         modelBuilder.Entity<WelfareEvent>().Property(e => e.TotalExpected).HasPrecision(18, 2);

@@ -3,6 +3,7 @@ import { Scale } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useMyGroups } from '../hooks/useMyGroups';
 import { getMyTruth } from '../api/truth';
+import { benefitsApi } from '../api/benefits';
 import { useApi } from '../lib/useApi';
 import { MemberStatement } from '../components/truth/MemberStatement';
 import { Button, Loading, Notice } from '../components/ui';
@@ -20,6 +21,8 @@ export function MyStatementPage() {
   const navigate = useNavigate();
   const { activeGroup, activeGroupId, loading: groupsLoading, error: groupsError } = useMyGroups();
   const { data, error } = useApi(activeGroupId ? () => getMyTruth(activeGroupId) : null, activeGroupId);
+  // Mafao ni ya ziada: yakishindwa kupakia (mf. sera haijawekwa), taarifa kuu inaonyeshwa hata hivyo
+  const mine = useApi(activeGroupId ? () => benefitsApi.me(activeGroupId) : null, activeGroupId);
 
   if (groupsLoading) return <Loading label={t("Inapakia makundi yako...")} />;
   if (groupsError) return <Notice tone="overdue">{groupsError}</Notice>;
@@ -49,7 +52,25 @@ export function MyStatementPage() {
       </header>
       {error && <Notice tone="overdue">{error}</Notice>}
       {!data && !error && <Loading label={t("Injini inahesabu taarifa yako...")} />}
-      {data && <MemberStatement data={data} showWarnings={isLeader} />}
+      {mine.data && mine.data.votesNeeded.length > 0 && (
+        <Notice
+          tone="warn"
+          title={t("Kura {0} zinakusubiri", { 0: mine.data.votesNeeded.length })}
+          action={
+            <Button size="sm" onClick={() => navigate('/mafao?tab=yangu')}>
+              {t("Piga kura")}
+            </Button>
+          }
+        >
+          {mine.data.votesNeeded.map((v) => `${v.caseNumber} · ${v.beneficiary ?? ''}`).join(', ')}
+        </Notice>
+      )}
+      {data && (
+        <MemberStatement
+          data={data}
+          benefits={mine.data ? { contributed: mine.data.totalContributed, received: mine.data.totalReceived } : undefined}
+        />
+      )}
     </div>
   );
 }

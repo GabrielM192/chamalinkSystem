@@ -21,6 +21,7 @@ public class LoanController : ControllerBase
         _loanService = loanService;
     }
 
+    [LegacyEndpoint("Mkopo unatolewa kupitia /api/loan-applications/{groupId}: ombi, kura za viongozi huru, na uthibitisho wa rejea ya M-Koba (SASISHO15).")]
     [HttpPost("group/{groupId}")]
     public async Task<IActionResult> Issue(Guid groupId, [FromBody] IssueLoanDto dto)
     {
@@ -50,6 +51,7 @@ public class LoanController : ControllerBase
 
     }
 
+    [LegacyEndpoint("Kutangaza mkopo umeshindikana kunahitaji viongozi wawili: /api/loan-applications/{groupId}/loans/{loanId}/default (SASISHO15).")]
     [HttpPost("{id}/mark-defaulted")]
     public async Task<IActionResult> MarkDefaulted(Guid id)
     {

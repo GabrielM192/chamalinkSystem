@@ -43,7 +43,7 @@ public static class StatementGapDescriber
 
         var phones = rows.Select(r => r.Phone).Distinct().ToList();
         var phoneMembers = await context.MemberPhones.AsNoTracking()
-            .Where(p => p.GroupId == groupId && phones.Contains(p.Phone))
+            .Where(p => p.GroupId == groupId && phones.Contains(p.Phone) && p.Status == TruthApprovalStatus.Approved)
             .Join(context.GroupMembers, p => p.GroupMemberId, m => m.Id,
                 (p, m) => new { p.Phone, m.Id, Name = m.User != null ? m.User.FullName : m.MemberNumber })
             .ToListAsync(ct);

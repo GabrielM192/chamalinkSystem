@@ -1,12 +1,8 @@
-import { apiClient } from './client';
+import { apiClient, refreshSession, type SessionPayload } from './client';
+import { setAccessToken } from './session';
 
-// Matches ChamaLink.Application.DTOs.AuthResponseDto exactly.
-export interface AuthResponse {
-  token: string;
-  userId: string;
-  fullName: string;
-  email: string;
-}
+// Inalingana na ChamaLink.Application.DTOs.AuthResponseDto.
+export type AuthResponse = SessionPayload;
 
 export interface LoginPayload {
   email: string;
@@ -20,12 +16,30 @@ export interface RegisterPayload {
   password: string;
 }
 
+// Njia za /auth kwa herufi ndogo: njia ya cookie (Path=/api/auth) ni case-sensitive kwenye browser.
 export async function login(payload: LoginPayload): Promise<AuthResponse> {
-  const response = await apiClient.post<AuthResponse>('/Auth/login', payload);
+  const response = await apiClient.post<AuthResponse>('/auth/login', payload);
+  setAccessToken(response.data.token);
   return response.data;
 }
 
-export async function register(payload: RegisterPayload): Promise<AuthResponse> {
-  const response = await apiClient.post<AuthResponse>('/Auth/register', payload);
-  return response.data;
+/** Usajili unarudisha ujumbe wa jumla TU (hakuna token) — mtumiaji anaingia kupitia ukurasa wa login. */
+export async function register(payload: RegisterPayload): Promise<string> {
+  const response = await apiClient.post<{ message: string }>('/auth/register', payload);
+  return response.data.message;
 }
+
+export async function logout(): Promise<void> {
+  try {
+    await apiClient.post('/auth/logout');
+  } finally {
+    setAccessToken(null);
+  }
+}
+
+export async function revokeAllSessions(): Promise<void> {
+  await apiClient.post('/auth/revoke-all');
+  setAccessToken(null);
+}
+
+export { refreshSession };

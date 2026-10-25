@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components -- provider + t()/hook zinakaa pamoja kwa makusudi (kama AuthContext) */
 import { createContext, Fragment, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { en } from './en';
+import { serverEn } from './server-en';
 
 /**
  * Lugha za kiolesura (frontend pekee — ujumbe wa server bado ni Kiswahili; utabadilishwa kwa misimbo baadaye).
@@ -44,7 +45,14 @@ export function getLocale(): string {
   return current === 'en' ? 'en-GB' : 'sw-TZ';
 }
 
-const dictionaries: Record<Lang, Record<string, string> | null> = { sw: null, en };
+// Ujumbe wa seva (serverEn) + kiolesura (en). Ufunguo mmoja ukiwa kwenye yote, wa kiolesura unashinda.
+const dictionaries: Record<Lang, Record<string, string> | null> = { sw: null, en: { ...serverEn, ...en } };
+
+/** Je, kuna tafsiri ya maandishi haya kwa lugha ya sasa? (sw: daima false — Kiswahili ndicho chanzo) */
+export function hasT(sw: string): boolean {
+  const dict = dictionaries[current];
+  return !!dict && Object.prototype.hasOwnProperty.call(dict, sw);
+}
 
 export function t(sw: string, vars?: Record<string, string | number | null | undefined>): string {
   const dict = dictionaries[current];

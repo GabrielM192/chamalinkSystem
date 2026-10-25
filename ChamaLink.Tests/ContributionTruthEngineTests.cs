@@ -281,6 +281,10 @@ public class ContributionTruthEngineTests
         Assert.True(P(a, 1).FineWaived);
         Assert.Equal(PeriodStatus.PaidLate, P(a, 1).Status);           // bado ni kuchelewa, ila bila faini
         Assert.Contains(a.Allocations, x => x.Target == "FineWaived");
+        // F-L1: kiasi kilichosamehewa kinaonekana (si idadi tu)
+        Assert.Equal(5_000m, P(a, 1).FineWaivedAmount);
+        Assert.Equal(5_000m, a.FinesWaivedAmount);
+        Assert.Equal(1, a.FinesWaivedCount);
 
         var b = ContributionTruthEngine.Replay(Founder("X"), pays, Ukonga, new DateTime(2026, 2, 20), adjustments: pending);
         Assert.Equal(5_000m, P(b, 1).FineDue);
@@ -337,6 +341,35 @@ public class ContributionTruthEngineTests
         Assert.Equal(0m, P(s, 2).ContributionPaid);
         Assert.Equal(5_000m, s.LoanOverdue);
         Assert.Equal(15_000m, s.Arrears);                             // Feb 10k + faini 5k
+    }
+
+    [Fact]
+    public void Gap7_WelfareSplit_Separates_JoinFee_ContributionArrears_And_LoanArrears()
+    {
+        var loan = TruthLoan.EqualInstallments("L1", new DateTime(2026, 1, 10), new DateTime(2026, 2, 28), 40_000m);
+        var pays = new[]
+        {
+            new TruthPayment("J", new(2026, 1, 20), 60_000m),
+            new TruthPayment("F", new(2026, 3, 10), 15_000m),
+        };
+        var s = ContributionTruthEngine.Replay(Founder("X"), pays, Ukonga, new DateTime(2026, 3, 20), loans: new[] { loan });
+        // Kianzio 20k, deni la michango 15k, deni la mkopo 5k
+        var all = WelfareDeductionRule.ComputeSplit(50_000m, s, true, true, true);
+        Assert.Equal((20_000m, 15_000m, 5_000m, 10_000m), (all.JoinFeeDeducted, all.ArrearsDeducted, all.LoanArrearsDeducted, all.NetPayout));
+        var noLoan = WelfareDeductionRule.ComputeSplit(50_000m, s, true, true, false);
+        Assert.Equal((0m, 15_000m), (noLoan.LoanArrearsDeducted, noLoan.NetPayout));
+        Assert.Equal(all.Approved, all.JoinFeeDeducted + all.ArrearsDeducted + all.LoanArrearsDeducted + all.NetPayout);
+
+        // Makato ya michango (Purpose=Contributions) HAYAGUSI mkopo; MAFAO-MKOPO (Auto) yanalipa mkopo kwanza
+        var withOffsets = pays.Concat(new[]
+        {
+            new TruthPayment("MAFAO-DENI-X", new(2026, 3, 15), 15_000m, PaymentSource.WelfareOffset, PaymentPurpose.Contributions, IsApproved: true),
+            new TruthPayment("MAFAO-MKOPO-X", new(2026, 3, 15), 5_000m, PaymentSource.WelfareOffset, PaymentPurpose.Auto, IsApproved: true),
+        }).ToArray();
+        var after = ContributionTruthEngine.Replay(Founder("X"), withOffsets, Ukonga, new DateTime(2026, 3, 20), loans: new[] { loan });
+        Assert.Equal(0m, after.Arrears);
+        Assert.Equal(0m, after.LoanOverdue);
+        Assert.Equal(0m, after.InvariantDifference);
     }
 
     [Fact]

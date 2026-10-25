@@ -21,7 +21,7 @@ public record RegisterDto(
     string PhoneNumber,
 
     [Required(ErrorMessage = "Neno la siri linahitajika.")]
-    [StringLength(100, MinimumLength = 6, ErrorMessage = "Neno la siri liwe angalau herufi 6.")]
+    [StringLength(128, ErrorMessage = "Neno la siri lisizidi herufi 128.")] // urefu wa chini: PasswordPolicy (config)
     string Password
 );
 
@@ -38,5 +38,6 @@ public record AuthResponseDto(
     string Token,
     Guid UserId,
     string FullName,
-    string Email
+    string Email,
+    int ExpiresInSeconds = 0
 );

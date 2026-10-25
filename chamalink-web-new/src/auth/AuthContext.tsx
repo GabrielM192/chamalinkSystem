@@ -1,59 +1,95 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import { login as loginRequest, register as registerRequest, type LoginPayload, type RegisterPayload, type AuthResponse } from '../api/auth';
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import {
+  login as loginRequest,
+  logout as logoutRequest,
+  revokeAllSessions,
+  refreshSession,
+  register as registerRequest,
+  type AuthResponse,
+  type LoginPayload,
+  type RegisterPayload,
+} from '../api/auth';
+import { setSessionEndedHandler } from '../api/session';
 
-interface StoredUser {
+interface SessionUser {
   userId: string;
   fullName: string;
   email: string;
 }
 
 interface AuthContextValue {
-  user: StoredUser | null;
+  user: SessionUser | null;
+  /** false mpaka jaribio la kwanza la kurejesha kikao (cookie) likamilike */
+  ready: boolean;
   login: (payload: LoginPayload) => Promise<void>;
-  register: (payload: RegisterPayload) => Promise<void>;
-  logout: () => void;
+  /** Inarudisha ujumbe wa jumla wa seva; HAIMwingizi mtumiaji (aingie kupitia login). */
+  register: (payload: RegisterPayload) => Promise<string>;
+  logout: () => Promise<void>;
+  /** SASISHO15: toka kwenye vifaa VYOTE (kila refresh token inafutwa, access token zote zinabatilishwa kwa `tv`). */
+  logoutEverywhere: () => Promise<void>;
 }
+
+/** Muda wa kuendeleza kikao (ms) — chini ya muda wa access token wa seva (Jwt:AccessTokenMinutes, chaguo-msingi dakika 15). */
+const SESSION_REFRESH_MS = 10 * 60 * 1000;
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-function readStoredUser(): StoredUser | null {
-  const raw = localStorage.getItem('user');
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as StoredUser;
-  } catch {
-    return null;
-  }
-}
+const toUser = (r: AuthResponse): SessionUser => ({ userId: r.userId, fullName: r.fullName, email: r.email });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<StoredUser | null>(readStoredUser);
+  const [user, setUser] = useState<SessionUser | null>(null);
+  const [ready, setReady] = useState(false);
 
-  const store = useCallback((response: AuthResponse) => {
-    const storedUser: StoredUser = {
-      userId: response.userId,
-      fullName: response.fullName,
-      email: response.email,
-    };
-    localStorage.setItem('token', response.token);
-    localStorage.setItem('user', JSON.stringify(storedUser));
-    setUser(storedUser);
-  }, []);
-
-  const login = useCallback(async (payload: LoginPayload) => store(await loginRequest(payload)), [store]);
-  // Kujisajili kunampa mtu akaunti tu (kuingia). Kuwa mwanachama wa kikundi ni hatua tofauti: kuanzisha
-  // kikundi, au kuomba kujiunga kwa kodi na kusubiri idhini ya viongozi.
-  const register = useCallback(async (payload: RegisterPayload) => store(await registerRequest(payload)), [store]);
-
-  const logout = useCallback(() => {
+  useEffect(() => {
+    // SASISHO15: token za zamani zilizokaa localStorage zinafutwa (sasa zinakaa kwenye kumbukumbu tu)
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    setUser(null);
+    setSessionEndedHandler(() => setUser(null));
+    let alive = true;
+    refreshSession().then((s) => {
+      if (!alive) return;
+      if (s) setUser(toUser(s));
+      setReady(true);
+    });
+    // Endeleza kikao kabla access token haijaisha (dakika ~15), ili ombi lisikatike katikati
+    const timer = window.setInterval(() => {
+      refreshSession().then((s) => {
+        if (alive && !s) setUser(null);
+      });
+    }, SESSION_REFRESH_MS);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+      setSessionEndedHandler(null);
+    };
   }, []);
 
-  return <AuthContext.Provider value={{ user, login, register, logout }}>{children}</AuthContext.Provider>;
+  const login = useCallback(async (payload: LoginPayload) => {
+    setUser(toUser(await loginRequest(payload)));
+  }, []);
+
+  const register = useCallback((payload: RegisterPayload) => registerRequest(payload), []);
+
+  const logout = useCallback(async () => {
+    try {
+      await logoutRequest();
+    } finally {
+      setUser(null);
+    }
+  }, []);
+
+  const logoutEverywhere = useCallback(async () => {
+    try {
+      await revokeAllSessions();
+    } finally {
+      setUser(null);
+    }
+  }, []);
+
+  return <AuthContext.Provider value={{ user, ready, login, register, logout, logoutEverywhere }}>{children}</AuthContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
   if (!context) {

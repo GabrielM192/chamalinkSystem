@@ -93,7 +93,7 @@ export function Card({
   bodyClassName?: string;
 }) {
   return (
-    <section className={`rounded-2xl border border-ink-100 bg-paper-raised shadow-[0_1px_0_rgba(21,42,78,0.04)] ${className}`}>
+    <section className={`rounded-xl border border-ink-100 bg-paper-raised shadow-[0_1px_2px_rgb(15_27_48/0.05)] ${className}`}>
       {(title || action) && (
         <header className="flex flex-wrap items-start justify-between gap-3 border-b border-ink-100 px-4 py-3 sm:px-5">
           <div className="min-w-0">

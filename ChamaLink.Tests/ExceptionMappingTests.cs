@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using System.Net;
 using ChamaLink.API.Middleware;
 using ChamaLink.Domain.Exceptions;
@@ -19,7 +20,11 @@ namespace ChamaLink.Tests;
 /// </summary>
 public class ExceptionMappingTests
 {
-    private static async Task<(int Status, string Body)> RunAsync(Exception ex, bool isDevelopment = false)
+    private static Task<(int Status, string Body)> RunAsync(Exception ex, bool isDevelopment = false, bool includeDetails = false)
+        => RunWithAsync(_ => throw ex, isDevelopment, includeDetails);
+
+    /// <summary>Kosa linatupwa NDANI ya pipeline na code halisi (mf. .NET yenyewe) — stack trace ya kweli.</summary>
+    private static async Task<(int Status, string Body)> RunWithAsync(RequestDelegate next, bool isDevelopment = false, bool includeDetails = false)
     {
         var context = new DefaultHttpContext();
         context.Response.Body = new MemoryStream();
@@ -27,9 +32,13 @@ public class ExceptionMappingTests
         var env = new StubEnv(isDevelopment);
 
         var middleware = new GlobalExceptionMiddleware(
-            _ => throw ex,
+            next,
             NullLogger<GlobalExceptionMiddleware>.Instance,
-            env);
+            env,
+            new Microsoft.Extensions.Configuration.ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Errors:IncludeExceptionDetails"] = includeDetails ? "true" : "false"
+            }).Build());
 
         await middleware.InvokeAsync(context);
 
@@ -148,9 +157,73 @@ public class ExceptionMappingTests
         var ex = new NullReferenceException("boom");
 
         var (_, prodBody) = await RunAsync(ex, isDevelopment: false);
-        var (_, devBody) = await RunAsync(ex, isDevelopment: true);
+        var (_, devBody) = await RunAsync(ex, isDevelopment: true, includeDetails: true);
+        // SASISHO16: Development PEKEE haitoshi — lazima iwashwe kwa makusudi
+        var (_, devDefault) = await RunAsync(ex, isDevelopment: true);
+        Assert.DoesNotContain("boom", devDefault);
+        Assert.DoesNotContain("debug", devDefault);
+        // na Production haionyeshi hata ikiwashwa
+        var (_, prodOn) = await RunAsync(ex, isDevelopment: false, includeDetails: true);
+        Assert.DoesNotContain("boom", prodOn);
 
         Assert.DoesNotContain("boom", prodBody);
         Assert.Contains("boom", devBody);
     }
+
+    // ---------------------------------------------------------------------
+    // SASISHO16: ujumbe wa exception za .NET hauvuji (majina ya ndani, funguo, aina)
+    // ---------------------------------------------------------------------
+    [Fact]
+    public async Task KeyNotFound_Ya_Dictionary_Haivujishi_Ufunguo()
+    {
+        var (status, body) = await RunWithAsync(ctx => { var v = new Dictionary<string, int>()["SIRI_YA_NDANI"]; ctx.Items["v"] = v; return Task.CompletedTask; });
+        Assert.Equal(404, status);
+        Assert.DoesNotContain("SIRI_YA_NDANI", body);
+        Assert.DoesNotContain("dictionary", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ArgumentException_Ya_DotNet_Haivujishi_Aina_Wala_Kigezo()
+    {
+        var (status, body) = await RunWithAsync(async ctx => { await Task.Yield(); ctx.Items["v"] = Enum.Parse<DayOfWeek>("SIRI_YA_NDANI"); });
+        Assert.Equal(400, status);
+        Assert.DoesNotContain("SIRI_YA_NDANI", body);
+        Assert.DoesNotContain("DayOfWeek", body);
+    }
+
+    [Fact]
+    public async Task ArgumentException_Yenye_ParamName_Haivujishi_Jina_La_Kigezo()
+    {
+        var (status, body) = await RunAsync(new ArgumentNullException("internalParamName"));
+        Assert.Equal(400, status);
+        Assert.DoesNotContain("internalParamName", body);
+    }
+
+    [Fact]
+    public async Task ArgumentException_Ya_ChamaLink_Bado_Inaonyesha_Ujumbe_Wake()
+    {
+        var (status, body) = await RunAsync(new ArgumentException("Namba ya simu haieleweki."));
+        Assert.Equal(400, status);
+        Assert.Contains("Namba ya simu haieleweki.", body);
+    }
+
+    [Fact]
+    public async Task Jibu_La_500_Halina_Debug_Wala_Template()
+    {
+        var (status, body) = await RunAsync(new InvalidOperationException("Npgsql: relation \"Users\" does not exist"));
+        Assert.Equal(500, status);
+        Assert.DoesNotContain("Npgsql", body);
+        Assert.DoesNotContain("Users", body);
+        Assert.DoesNotContain("\"debug\"", body);
+        Assert.DoesNotContain("\"template\"", body);
+        Assert.Contains("correlationId", body);
+    }
+
+    [Theory]
+    [InlineData("$.amount", "amount")]
+    [InlineData("req.Items[0].Amount", "amount")]
+    [InlineData("$", "")]
+    [InlineData("OccurredAt", "occurredAt")]
+    public void RequestValidation_Jina_La_Sehemu_Bila_Maelezo_Ya_Ndani(string key, string expected)
+        => Assert.Equal(expected, RequestValidation.FieldName(key));
 }

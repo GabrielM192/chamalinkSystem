@@ -8,6 +8,8 @@ export interface TruthCtx {
   groupId: string;
   groupName: string;
   role: string;
+  /** SASISHO18: MonthlySavings | EventBased | Hybrid — hubadilisha kanuni zinazoonekana kwenye Mipangilio. */
+  groupType: string;
   canReset: boolean;
   members: MemberLite[];
   settings: TruthSettings | null;

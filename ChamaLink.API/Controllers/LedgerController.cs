@@ -112,7 +112,8 @@ public class LedgerController : ControllerBase
         var caller = await _groupAuth.RequireMembershipAsync(User.GetUserId(), groupId);
 
         bool isOwnStatement = caller.UserId == userId;
-        bool isLeader = caller.Role is GroupRole.Treasurer or GroupRole.Chairperson or GroupRole.Secretary;
+        // SASISHO17: nafasi INAYOTUMIKA (hai + nje ya kipindi cha kusubiri), si Role ghafi
+        bool isLeader = ChamaLink.Infrastructure.Services.Common.MemberAccess.IsEffectiveLeader(caller);
 
         if (!isOwnStatement && !isLeader)
         throw new UnauthorizedAccessException("Unaweza kuona statement yako mwenyewe pekee, isipokuwa kama wewe ni kiongozi wa kikundi.");

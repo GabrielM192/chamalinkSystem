@@ -1,4 +1,5 @@
 using ChamaLink.API.Extensions;
+using ChamaLink.API.Filters;
 using ChamaLink.Application.DTOs;
 using ChamaLink.Domain;
 using ChamaLink.Domain.Entities;
@@ -20,6 +21,7 @@ namespace ChamaLink.API.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
+[LegacyEndpoint("Utoaji wa pesa unapitia Mafao (/api/benefits/{groupId}) na unathibitishwa kwa muamala wa M-Koba; matumizi mengine: /api/benefits/{groupId}/withdrawals/explain")]
 public class WithdrawalController : ControllerBase
 {
     private readonly WithdrawalService _withdrawalService;

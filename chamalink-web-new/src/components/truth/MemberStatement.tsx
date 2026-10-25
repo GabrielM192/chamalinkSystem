@@ -15,6 +15,7 @@ import {
 } from '../../lib/truth';
 
 import { t } from '../../i18n';
+import { locText } from '../../lib/loc';
 /**
  * Taarifa kamili ya mwanachama kutoka Injini ya Ukweli.
  * Inatumika na "Taarifa Yangu" (mwanachama) na paneli ya kiongozi.
@@ -24,11 +25,14 @@ export function MemberStatement({
   data,
   compact,
   showWarnings = true,
+  benefits,
 }: {
   data: MemberTruth;
   compact?: boolean;
-  // Tahadhari za kiufundi (mf. JoinedAt ya DB) ni za viongozi
+  // SASISHO16: seva tayari inachuja (ubora wa data = viongozi tu); hii inaruhusu skrini kuzificha kabisa
   showWarnings?: boolean;
+  /** Mafao aliyochangia/aliyopokea (Taarifa Yangu pekee) */
+  benefits?: { contributed: number; received: number };
 }) {
   const tot = data.totals;
   const months = data.monthlyStatement.filter((m) => m.status !== 'NotYetOpen');
@@ -60,6 +64,8 @@ export function MemberStatement({
           hint={tot.currentDue > 0 ? t("Mwezi huu unadaiwa {0} (bado muda upo)", { 0: num(tot.currentDue) }) : t("Pamoja na Kianzio")}
         />
       </div>
+
+      <LifetimeCard tot={tot} benefits={benefits} />
 
       {/* Kianzio */}
       {tot.joinFeeDue > 0 && (
@@ -99,11 +105,7 @@ export function MemberStatement({
         )}
       </div>
 
-      {showWarnings && data.warnings.map((w, i) => (
-        <Notice key={i} tone="warn">
-          {w}
-        </Notice>
-      ))}
+      {showWarnings && <StatementNotices data={data} />}
 
       {/* Ramani ya miezi */}
       <div>
@@ -398,6 +400,100 @@ function PaymentHistory({ allocations }: { allocations: AllocationLine[] }) {
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+/**
+ * Jumla ya pesa aliyochangia tangu ajiunge (M-Koba + ya mkononi iliyoidhinishwa) na ilikokwenda.
+ * Ukaguzi wa ndani: jumla = mgawanyo. Isipolingana, onyesha tahadhari (injini inaikataa ripoti pia).
+ */
+function LifetimeCard({ tot, benefits }: { tot: MemberTruth['totals']; benefits?: { contributed: number; received: number } }) {
+  const offset0 = tot.welfareOffset ?? 0;
+  const accepted = tot.totalAccepted ?? tot.acceptedFromMkoba + tot.acceptedManual + offset0;
+  const offset = tot.welfareOffset ?? 0;
+  const cash = accepted - offset;
+  const parts = [
+    { label: t("Michango ya mwezi"), v: tot.contributionPaid },
+    { label: t("Faini"), v: tot.finePaid },
+    { label: t("Kianzio"), v: tot.joinFeePaid },
+    { label: t("Mkopo"), v: tot.loanRepaid + (tot.loanPenaltyPaid ?? 0) },
+    { label: t("Akiba"), v: tot.savings },
+  ];
+  const sum = parts.reduce((s, p) => s + p.v, 0);
+  const ok = Math.round(sum) === Math.round(accepted);
+  return (
+    <div className="rounded-xl border border-ink-100 bg-paper-raised px-4 py-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-600">{t("Jumla uliyochangia tangu ujiunge")}</div>
+          <div className="figure mt-1 text-xl font-semibold text-ink-950 sm:text-2xl">{tsh(cash)}</div>
+          <div className="mt-0.5 text-xs text-ink-600">
+            {t("M-Koba {0} · mkononi {1}", { 0: num(tot.acceptedFromMkoba), 1: num(tot.acceptedManual) })}
+            {offset > 0 ? ` · ${t("makato ya mafao {0}", { 0: num(offset) })}` : ''}
+            {(tot.finesWaivedAmount ?? 0) > 0 ? ` · ${t("faini zilizosamehewa {0}", { 0: num(tot.finesWaivedAmount) })}` : ''}
+          </div>
+        </div>
+        {ok ? (
+          <span className="inline-flex items-center gap-1 text-xs text-standing-good" title={t("Jumla inalingana na mgawanyo")}>
+            <ShieldCheck size={14} /> {t("Imekaguliwa")}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-standing-overdue">
+            <ShieldAlert size={14} /> {t("Tofauti {0} — wajulishe viongozi", { 0: num(accepted - sum) })}
+          </span>
+        )}
+      </div>
+      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 border-t border-ink-100 pt-3 text-sm sm:grid-cols-5">
+        {parts.map((p) => (
+          <div key={p.label} className="flex justify-between gap-2 sm:block">
+            <dt className="text-xs text-ink-600">{p.label}</dt>
+            <dd className="figure font-medium text-ink-900">{num(p.v)}</dd>
+          </div>
+        ))}
+      </dl>
+      {benefits && (benefits.contributed > 0 || benefits.received > 0) && (
+        <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 border-t border-ink-100 pt-3 text-sm">
+          <span>
+            <span className="text-ink-600">{t("Umechangia mafao:")}</span> <b className="figure">{num(benefits.contributed)}</b>
+          </span>
+          <span>
+            <span className="text-ink-600">{t("Umepokea mafao:")}</span> <b className="figure">{num(benefits.received)}</b>
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * SASISHO16: taarifa za Injini ya Ukweli kwa lugha ya biashara, zinatafsiriwa (SW/EN).
+ * "notice" = taarifa ya kawaida; "dataQuality" = ubora wa data (viongozi) — zinakusanywa sehemu moja inayofunguka.
+ */
+function StatementNotices({ data }: { data: MemberTruth }) {
+  const list = data.notices ?? data.warnings.map((w) => ({ code: '', kind: 'notice' as const, message: w, tpl: w, args: [] as string[] }));
+  const notices = list.filter((n) => n.kind === 'notice');
+  const quality = list.filter((n) => n.kind === 'dataQuality');
+  if (list.length === 0) return null;
+  return (
+    <div className="space-y-2">
+      {notices.map((n, i) => (
+        <Notice key={`n${i}`} tone="warn">
+          {locText(n.message, n.tpl, n.args)}
+        </Notice>
+      ))}
+      {quality.length > 0 && (
+        <details className="rounded-xl border border-ink-100 bg-paper-raised px-4 py-2 text-sm">
+          <summary className="cursor-pointer font-medium text-ink-700">
+            {t('Ubora wa data: {0}', { 0: String(quality.length) })}
+          </summary>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-ink-600">
+            {quality.map((n, i) => (
+              <li key={`q${i}`}>{locText(n.message, n.tpl, n.args)}</li>
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   );
 }

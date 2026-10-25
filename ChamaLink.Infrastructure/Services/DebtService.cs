@@ -79,9 +79,9 @@ public class DebtService
             if (strategy != DebtAllocationStrategy.CurrentMonthFirst)
                 throw new Domain.Exceptions.ValidationException(
                     $"Mkakati wa mgawanyo wa madeni '{strategy}' bado haujatekelezwa. " +
-                    "Mfumo unaunga mkono 'CurrentMonthFirst' pekee kwa sasa. " +
-                    "Badilisha DebtAllocationStrategy kwenye settings za kikundi ili kuendelea. " +
-                    "(Kukataa hapa ni bora kuliko kugawa pesa kwa mpangilio usio sahihi kimya kimya.)");
+                    $"Mfumo unaunga mkono 'CurrentMonthFirst' pekee kwa sasa. " +
+                    $"Badilisha DebtAllocationStrategy kwenye settings za kikundi ili kuendelea. " +
+                    $"(Kukataa hapa ni bora kuliko kugawa pesa kwa mpangilio usio sahihi kimya kimya.)");
         }
 
         if (availableAmount <= 0)

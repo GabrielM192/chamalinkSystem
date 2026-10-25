@@ -1,5 +1,6 @@
 using ChamaLink.Domain;
 using ChamaLink.Domain.Entities;
+using ChamaLink.Domain.Exceptions;
 
 namespace ChamaLink.Infrastructure.Services;
 
@@ -19,7 +20,10 @@ public static class ApprovalPolicyResolver
 {
     public static (HashSet<GroupRole> AllowedRoles, int RequiredApprovals) Resolve(ApprovalPolicy? policy)
     {
-        var mode = policy?.Mode ?? ApprovalMode.TreasurerOnly;
+        // FAIL-CLOSED (Ushauri §4): sera isipowekwa HAKUNA idhini ya kimya kimya ya mtu mmoja — 409 "weka sera kwanza".
+        if (policy is null)
+            throw new ConflictException("Kikundi hakijaweka sera ya idhini kwa kitendo hiki. Mwenyekiti aweke sera kwenye Mipangilio kwanza.");
+        var mode = policy.Mode;
 
         switch (mode)
         {
@@ -35,14 +39,11 @@ public static class ApprovalPolicyResolver
             case ApprovalMode.CustomApproval:
                 var roles = ParseCustomRoles(policy?.CustomRoles);
                 if (roles.Count == 0)
-                {
-                    // A group misconfigured CustomApproval with no roles
-                    // listed - fall back to the safe default rather than
-                    // making the operation impossible to approve at all.
-                    roles = new HashSet<GroupRole> { GroupRole.Treasurer };
-                }
+                    // Zamani: ilirudi kwa "Treasurer peke yake" kimya kimya (fail-open). Sasa: sera mbovu = hakuna idhini.
+                    throw new ConflictException("Sera ya idhini (CustomApproval) haina nafasi yoyote halali ya kuidhinisha. Irekebishwe kwenye Mipangilio.");
                 int required = policy?.CustomRequiredApprovals ?? roles.Count;
-                required = Math.Clamp(required, 1, roles.Count);
+                // Manaibu wanaruhusiwa (Katibu/Mtunza-hazina zaidi ya mmoja), kwa hiyo idadi haifungwi kwa idadi ya NAFASI.
+                if (required < 1) throw new ConflictException("Idadi ya idhini kwenye sera iwe angalau 1.");
                 return (roles, required);
 
             case ApprovalMode.TreasurerOnly:

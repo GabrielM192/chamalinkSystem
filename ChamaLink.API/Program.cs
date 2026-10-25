@@ -13,6 +13,9 @@ using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.HttpOverrides;
 
+// SASISHO17: maandishi ya seva hayategemei locale ya mashine (mf. "45,000" kila mahali, si "45 000")
+ChamaLink.Infrastructure.Services.Common.AppCulture.UseInvariant();
+
 var builder = WebApplication.CreateBuilder(args);
 
 // SIRI ZA NDANI (ukaguzi 2026-09-15, C-3): faili `*.local.json` zinapakiwa
@@ -52,10 +55,9 @@ builder.Services.AddScoped<AccountResolverService>();
 // kwenye ledger (chanzo cha ukweli) badala ya kuzibadilisha moja kwa moja.
 builder.Services.AddScoped<MemberCounterSyncService>();
 
-// FIX: IEventService existed but was never registered before, so
-// EventController (also new) could not be created and the Event/Tukio
-// feature was completely unreachable.
-builder.Services.AddScoped<IEventService, EventService>();
+// SASISHO18: michango ya tukio ya zamani (EventService/EventController) imeondolewa.
+// Vikundi vya "kila tukio" vinatumia EventWalletService (pochi + wajibu), na
+// michango ya matukio ya kikundi cha mwezi inapita Mafao (BenefitService).
 
 // NEW (Sprint 1 + Sprint 2 gaps): Fine/Debt entities, the financial
 // intelligence layer (Collection Rate / Defaulters / Group Balance /
@@ -107,21 +109,54 @@ builder.Services.AddScoped<FinancialPositionService>();
 builder.Services.AddScoped<MemberStatusEngine>();
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<WelfareService>();
-builder.Services.AddScoped<ReconciliationServiceV2>();
-// Verification & Reconciliation (Data Repair kwanza, frontend baadaye)
-builder.Services.AddScoped<VerificationService>();
-// Ledger Classification Audit (uchunguzi wa 135k ya Tunganege)
-builder.Services.AddScoped<LedgerClassificationService>();
-// Obligation Engine + Source-of-Truth Audit
-builder.Services.AddScoped<ObligationEngine>();
-builder.Services.AddScoped<PositionProofService>();
-// Ledger Reclassification (generic, no hardcoded)
-builder.Services.AddScoped<LedgerReclassificationService>();
-// Historical JoinFee with approval workflow
-builder.Services.AddScoped<HistoricalJoinFeeService>();
+// SASISHO17 (M): huduma za uchunguzi/za zamani zilizotumiwa na DebugController/HistoricalJoinFeeController tu
+// (ReconciliationServiceV2, VerificationService, LedgerClassificationService, ObligationEngine, PositionProofService,
+// LedgerReclassificationService, HistoricalJoinFeeService) ZIMEFUTWA pamoja na controllers zao — msimbo usiotumika ni eneo la mashambulizi.
 builder.Services.AddScoped<ChamaLink.Infrastructure.Services.Truth.TruthLedgerService>(); // Injini ya Ukweli (kusoma)
 builder.Services.AddScoped<ChamaLink.Infrastructure.Services.Truth.TruthSetupService>();  // Injini ya Ukweli (kuandika)
 builder.Services.AddScoped<ChamaLink.Infrastructure.Services.MembershipService>();                // Usajili, maombi ya kujiunga, nafasi, namba za uanachama
+// Mafao (msiba/sherehe), arifa, kura za hali ya mwanachama — Awamu B/C/D ya Ushauri 2026-09-28
+builder.Services.AddScoped<ChamaLink.Infrastructure.Services.Benefits.NotificationService>();
+builder.Services.AddScoped<ChamaLink.Infrastructure.Services.Benefits.IEvidenceStorage, ChamaLink.Infrastructure.Services.Benefits.LocalDiskEvidenceStorage>();
+builder.Services.AddScoped<ChamaLink.Infrastructure.Services.Benefits.BenefitService>();
+// SASISHO18: pochi + wajibu wa matukio kwa vikundi vya "kila tukio".
+builder.Services.AddScoped<ChamaLink.Infrastructure.Services.Events.EventWalletService>();
+builder.Services.AddScoped<ChamaLink.Infrastructure.Services.Events.AtRiskService>(); // SASISHO19: hatarini kuondolewa + kurudi
+// SASISHO21 — sanduku la malipo: kodi ya malipo, ulinganisho wa statement, madai ya wanachama.
+builder.Services.AddScoped<ChamaLink.Infrastructure.Services.Events.PaymentInboxService>();
+// SASISHO21 — rufaa: viongozi 2+ wanaamua; mmoja hawezi.
+builder.Services.AddScoped<ChamaLink.Infrastructure.Services.Appeals.AppealService>();
+// SASISHO21 — PDF za hazina (risiti + ripoti). Zinaandikwa ndani ya mfumo, hakuna maktaba ya nje.
+builder.Services.AddScoped<ChamaLink.Infrastructure.Services.Documents.PaymentDocumentsService>();
+// SASISHO21 (Sehemu ya 2) — SMS za no-reply. Mtoa-huduma HATAJWI kwenye msimbo;
+// anabadilishwa kwa appsettings (Sms:Gateway = "Log" | "Http").
+builder.Services.AddScoped<ChamaLink.Infrastructure.Services.Sms.SmsService>();
+builder.Services.AddHttpClient<ChamaLink.Infrastructure.Services.Sms.ISmsGateway, ChamaLink.Infrastructure.Services.Sms.HttpSmsGateway>();
+builder.Services.AddSingleton<ChamaLink.Infrastructure.Services.Sms.ISmsGateway>(sp =>
+    string.Equals(sp.GetRequiredService<IConfiguration>()["Sms:Gateway"], "Http", StringComparison.OrdinalIgnoreCase)
+        ? sp.GetRequiredService<ChamaLink.Infrastructure.Services.Sms.HttpSmsGateway>()
+        : ActivatorUtilities.CreateInstance<ChamaLink.Infrastructure.Services.Sms.LogSmsGateway>(sp));
+// SASISHO20 — msimamizi wa MFUMO (platform). Hana uwezo wa fedha: dashboard + msaada + break-glass (4-eyes).
+builder.Services.AddScoped<ChamaLink.Infrastructure.Services.Platform.PlatformAuditService>();
+builder.Services.AddScoped<ChamaLink.Infrastructure.Services.Platform.PlatformAuthService>();
+builder.Services.AddScoped<ChamaLink.Infrastructure.Services.Platform.PlatformApprovalService>();
+builder.Services.AddScoped<ChamaLink.Infrastructure.Services.Platform.PlatformGroupService>();
+builder.Services.AddScoped<ChamaLink.Infrastructure.Services.Platform.PlatformSupportService>();
+builder.Services.AddScoped<ChamaLink.Infrastructure.Services.Loans.LoanApplicationService>();
+// Mnyororo wa hash wa kumbukumbu za ukaguzi (SASISHO13)
+if (!builder.Environment.IsEnvironment("Testing"))
+    builder.Services.AddHostedService<ChamaLink.Infrastructure.Services.Truth.AuditSealingBackgroundService>();
+builder.Services.AddScoped<ChamaLink.Infrastructure.Services.Benefits.MemberStatusService>();
+builder.Services.AddScoped<ChamaLink.Infrastructure.Services.RoleChangeService>();
+builder.Services.AddScoped<ChamaLink.Infrastructure.Services.Truth.ResetRequestService>();
+builder.Services.AddScoped<ChamaLink.Infrastructure.Services.Truth.StatementImportService>(); // SASISHO17 (P0-2): PDF kwa viongozi wawili // SASISHO17 (P0-6): kufuta kwa viongozi wawili   // SASISHO17: vyeo kwa pendekezo + kura
+if (!builder.Environment.IsEnvironment("Testing"))
+    builder.Services.AddHostedService<ChamaLink.Infrastructure.Services.Benefits.StatusSchedulerBackgroundService>(); // SASISHO17 (K)
+if (!builder.Environment.IsEnvironment("Testing"))
+    builder.Services.AddHostedService<ChamaLink.Infrastructure.Services.Sms.SmsDispatchBackgroundService>(); // SASISHO21: mnyororo wa SMS
+// SASISHO18: faini ya deni la tukio + kulipa madeni kwa amana zilizopo (vikundi vya "kila tukio" pekee).
+if (!builder.Environment.IsEnvironment("Testing"))
+    builder.Services.AddHostedService<ChamaLink.Infrastructure.Services.Events.EventWalletBackgroundService>();
 
 // SECURITY FIX (audit Stage 2: "CORS haipo"): with no CORS policy at
 // all, a browser blocks the React/TS frontend from calling this API
@@ -140,9 +175,11 @@ builder.Services.AddCors(options =>
     {
         if (corsOrigins.Length > 0)
         {
+            // AllowCredentials: refresh token iko kwenye HttpOnly cookie (SASISHO15) — inahitaji origins maalum (si "*").
             policy.WithOrigins(corsOrigins)
                   .AllowAnyHeader()
-                  .AllowAnyMethod();
+                  .AllowAnyMethod()
+                  .AllowCredentials();
         }
         // No origins configured -> the policy allows nothing. Safer
         // default than silently falling back to wide-open.
@@ -159,26 +196,52 @@ builder.Services.AddCors(options =>
 // endpoints (see AuthController). Both are partitioned per client IP so
 // one abusive caller can't burn through the limit that's meant to cover
 // everyone else sharing this process.
+// UKUAJI (Ushauri §5): mitandao ya simu Tanzania inatumia CGNAT — maelfu ya watu hushiriki IP moja. Kwa hiyo kikomo
+// cha jumla sasa kinahesabiwa kwa MTUMIAJI aliyeingia (userId kutoka JWT); IP inatumika tu kwa wasioingia.
+// Middleware imewekwa BAADA ya UseAuthentication ili utambulisho ujulikane. Viwango vinatoka config (RateLimit:*).
+var perUserLimit = builder.Configuration.GetValue<int?>("RateLimit:PerUserPerMinute") ?? 120;
+var anonLimit = builder.Configuration.GetValue<int?>("RateLimit:AnonymousPerIpPerMinute") ?? 60;
+var authLimit = builder.Configuration.GetValue<int?>("RateLimit:AuthPerIpPerMinute") ?? 5;
+// SASISHO15: kuendeleza kikao (refresh/logout) kunatokea kila baada ya dakika chache na kila ukurasa unapofunguliwa —
+// si jaribio la neno la siri, kwa hiyo kina kikomo chake (bado kwa IP) ili tabo kadhaa zisimfungie mtumiaji nje.
+var sessionLimit = builder.Configuration.GetValue<int?>("RateLimit:SessionPerIpPerMinute") ?? 30;
+var uploadLimit = builder.Configuration.GetValue<int?>("RateLimit:UploadsPerUserPerMinute") ?? 6; // SASISHO17 (P1-9)
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    {
+        var uid = httpContext.User?.Identity?.IsAuthenticated == true
+            ? httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? httpContext.User.FindFirst("sub")?.Value
+            : null;
+        var key = uid is not null ? "u:" + uid : "ip:" + (httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+        return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = uid is not null ? perUserLimit : anonLimit,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        });
+    });
+
+    options.AddPolicy("session", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 120,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0
-            }));
+            factory: _ => new FixedWindowRateLimiterOptions { PermitLimit = sessionLimit, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+
+    // SASISHO17 (P1-9): kupakia faili (PDF ya M-Koba, vyeti) ni gharama kubwa (parse/hash/usimbaji) — kikomo chake kwa mtumiaji
+    options.AddPolicy("upload", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: "up:" + (httpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                                   ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"),
+            factory: _ => new FixedWindowRateLimiterOptions { PermitLimit = uploadLimit, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 
     options.AddPolicy("auth", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 5,
+                PermitLimit = authLimit,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
@@ -189,7 +252,7 @@ builder.Services.AddRateLimiter(options =>
 //
 // Zamani appsettings.json ilikuwa na JWT key na neno la siri la database
 // zikiwa wazi, na zilikuwa zimeingia kwenye git tangu commit ya kwanza:
-//     "Jwt:Key": "ChamaLinkSandboxSecretKey2024ForTestingOnlyMinimum32Bytes!!"
+//     "Jwt:Key": <key ya sandbox iliyovuja — sasa iko kwenye orodha ya kukataa: ProductionGuard.LeakedSandboxJwtKey>
 //
 // Hii si nadharia - NILIITHIBITISHA. Nilitumia key hiyo kutengeneza JWT yangu
 // mwenyewe (Python + HMAC-SHA256) kwa mtumiaji asiyeopo hata kwenye database,
@@ -229,11 +292,70 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuerSigningKey = true,
         ValidIssuer = jwtSettings["Issuer"],
         ValidAudience = jwtSettings["Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(signingKey)
+        IssuerSigningKey = new SymmetricSecurityKey(signingKey),
+        // SASISHO15: access token ni ya dakika chache — ClockSkew ya dakika 5 (chaguo-msingi) ingeiongezea muda
+        ClockSkew = TimeSpan.FromMinutes(1),
+        // SASISHO16: algorithm moja tu (HS256), token lazima iwe na muda wa kuisha na sahihi
+        ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha256 },
+        RequireExpirationTime = true,
+        RequireSignedTokens = true
+    };
+    // SASISHO16: kichwa cha WWW-Authenticate kisieleze sababu ("token expired at …", "signature invalid")
+    options.IncludeErrorDetails = false;
+    options.MapInboundClaims = true;
+    // Vikao vilivyofutwa ("funga vikao vyote"): TokenVersion ya token lazima ilingane na ya mtumiaji sasa
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = async ctx =>
+        {
+            var sub = ctx.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                      ?? ctx.Principal?.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+            var tv = ctx.Principal?.FindFirst(ChamaLink.Infrastructure.Services.AuthService.TokenVersionClaim)?.Value;
+            if (!Guid.TryParse(sub, out var uid)) { ctx.Fail("sub"); return; }
+            var db = ctx.HttpContext.RequestServices.GetRequiredService<ChamaLink.Infrastructure.ApplicationDbContext>();
+            var current = await db.Users.AsNoTracking().Where(u => u.Id == uid).Select(u => (int?)u.TokenVersion).FirstOrDefaultAsync();
+            if (current is null || (tv ?? "0") != current.Value.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                ctx.Fail("Kikao kimefungwa");
+        }
     };
 });
 
-builder.Services.AddControllers();
+// SASISHO15: usitangaze aina ya server (Kestrel) kwenye kila jibu
+builder.WebHost.ConfigureKestrel(k => k.AddServerHeader = false);
+
+builder.Services.AddControllers()
+    .ConfigureApiBehaviorOptions(o =>
+    {
+        // SASISHO16: makosa ya muundo wa ombi (JSON mbovu, aina isiyo sahihi) yalikuwa yanarudisha ujumbe wa .NET
+        // ("The JSON value could not be converted to System.Guid. Path: $.x | LineNumber…") — unafichua aina za
+        // ndani. Sasa: jina la sehemu tu + ujumbe wa jumla unaotafsirika, pamoja na correlationId.
+        o.InvalidModelStateResponseFactory = ctx =>
+        {
+            var fields = ctx.ModelState.Where(kv => kv.Value is { Errors.Count: > 0 })
+                .Select(kv => ChamaLink.API.Middleware.RequestValidation.FieldName(kv.Key))
+                .Where(f => f.Length > 0).Distinct().Take(10).ToList();
+            string msg = fields.Count > 0
+                ? $"Ombi halina ukamilifu: angalia {string.Join(", ", fields)}."
+                : "Ombi halina ukamilifu.";
+            // Ujumbe wetu wenyewe wa DataAnnotations (Kiswahili) unarudi; wa framework unafichwa
+            var own = ctx.ModelState.Values.SelectMany(v => v.Errors)
+                .Select(ChamaLink.API.Middleware.RequestValidation.OwnMessage).FirstOrDefault(m => m is not null);
+            if (own is not null) msg = own;
+            var errors = ctx.ModelState.Where(kv => kv.Value is { Errors.Count: > 0 })
+                .GroupBy(kv => ChamaLink.API.Middleware.RequestValidation.FieldName(kv.Key)).Where(g => g.Key.Length > 0).Take(10)
+                .ToDictionary(g => g.Key, g => g.SelectMany(kv => kv.Value!.Errors)
+                    .Select(e => ChamaLink.API.Middleware.RequestValidation.OwnMessage(e) ?? "Thamani si sahihi.").Distinct().ToArray());
+            var body = new
+            {
+                type = "https://httpstatuses.io/400", title = "Ombi halina ukamilifu", status = 400,
+                detail = msg, message = msg,
+                template = own ?? (fields.Count > 0 ? "Ombi halina ukamilifu: angalia {0}." : "Ombi halina ukamilifu."),
+                args = own is null && fields.Count > 0 ? new[] { string.Join(", ", fields) } : Array.Empty<string>(),
+                errors, correlationId = ctx.HttpContext.TraceIdentifier
+            };
+            return new Microsoft.AspNetCore.Mvc.BadRequestObjectResult(body) { ContentTypes = { "application/problem+json" } };
+        };
+    });
 // INJINI YA UKWELI: kazi za nyuma za ZAMANI zinaandika faini/madeni kwenye meza za
 // zamani (Fines, Debts, Loans.LatePenaltyCharged) kwa kanuni tofauti na Injini ya Ukweli.
 // Zikiendelea, mfumo una "ukweli" miwili unaogongana. Kwa hiyo zimezimwa kwa chaguo-msingi;
@@ -250,6 +372,8 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "ChamaLink API", Version = "v1" });
+    // Aina zenye jina moja kwenye controller tofauti (mf. VoteRequest) zisigongane
+    c.CustomSchemaIds(t => (t.FullName ?? t.Name).Replace("+", "."));
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Description = "Ingiza JWT Token hivi: Bearer {token}",
@@ -279,7 +403,7 @@ builder.Services.AddSwaggerGen(c =>
 // ndizo njia mbili za kawaida za uzalishaji.
 {
     var earlyKey = builder.Configuration["Jwt:Key"] ?? string.Empty;
-    if (earlyKey.Length > 0 && earlyKey == "ChamaLinkSandboxSecretKey2024ForTestingOnlyMinimum32Bytes!!")
+    if (earlyKey.Length > 0 && earlyKey == ChamaLink.API.Security.ProductionGuard.LeakedSandboxJwtKey)
     {
         throw new InvalidOperationException(
             "Unatumia JWT key ILE ILE iliyo kwenye GitHub ya umma - mtu yeyote anaweza " +
@@ -288,6 +412,40 @@ builder.Services.AddSwaggerGen(c =>
 }
 
 var app = builder.Build();
+
+// ============================================================================
+// SASISHO20 — msimamizi wa KWANZA wa mfumo (bootstrap)
+//
+// Hii ni amri ya CONSOLE pekee: `dotnet run --project ChamaLink.API -- --seed-platform-admin`
+// Inasoma PLATFORM_ADMIN_EMAIL / PLATFORM_ADMIN_PASSWORD / PLATFORM_ADMIN_NAME kutoka env.
+// Hakuna neno la siri lililoandikwa kwenye code, na hakuna endpoint ya umma inayounda
+// msimamizi wa kwanza (mtu mwenye console ya server ana uwezo wa kila kitu — hivyo hii
+// si njia ya nyuma). Msimamizi huyo ataombwa kuwasha MFA akiingia mara ya kwanza.
+// ============================================================================
+if (args.Contains("--seed-platform-admin"))
+{
+    using var scope = app.Services.CreateScope();
+    var seeder = scope.ServiceProvider.GetRequiredService<ChamaLink.Infrastructure.Services.Platform.PlatformAuthService>();
+    var email = Environment.GetEnvironmentVariable("PLATFORM_ADMIN_EMAIL");
+    var password = Environment.GetEnvironmentVariable("PLATFORM_ADMIN_PASSWORD");
+    var name = Environment.GetEnvironmentVariable("PLATFORM_ADMIN_NAME") ?? "Msimamizi wa Mfumo";
+    if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+    {
+        Console.WriteLine("Weka PLATFORM_ADMIN_EMAIL na PLATFORM_ADMIN_PASSWORD (angalau herufi 12).");
+        return;
+    }
+    try
+    {
+        await seeder.SeedFirstAdminAsync(email, password, name);
+        Console.WriteLine($"Msimamizi wa kwanza ameundwa: {email} (SuperAdmin).");
+        Console.WriteLine("Ingia kwenye /admin — utaombwa kuwasha MFA (Google Authenticator / Authy).");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("Imeshindikana: " + ex.Message);
+    }
+    return;
+}
 
 // ============================================================================
 // UKAGUZI WA SIRI (ukaguzi 2026-09-15, C-3)
@@ -319,7 +477,7 @@ var app = builder.Build();
     }
 
     // Onyo la wazi ikiwa bado unatumia key iliyokwisha-vuja kwenye GitHub.
-    if (configuredJwtKey == "ChamaLinkSandboxSecretKey2024ForTestingOnlyMinimum32Bytes!!")
+    if (configuredJwtKey == ChamaLink.API.Security.ProductionGuard.LeakedSandboxJwtKey)
     {
         throw new InvalidOperationException(
             "Unatumia JWT key ILE ILE iliyo kwenye GitHub ya umma - mtu yeyote anaweza " +
@@ -327,9 +485,21 @@ var app = builder.Build();
     }
 }
 
+// SASISHO17 (P1-5): usanidi hatari unakataliwa nje ya Development/Testing (API haianzi kabisa)
+// SASISHO17 (P0-6): usanidi hatari → API inasimama kwa exit code 78 (EX_CONFIG) na sababu zote kwenye log (bila siri),
+// badala ya ajali (SIGABRT/core dump). systemd/docker wanaona kosa la usanidi waziwazi.
+try { ChamaLink.API.Security.ProductionGuard.EnforceOrThrow(app.Configuration, app.Environment, app.Logger); }
+catch (InvalidOperationException ex) when (ex.Message.StartsWith("ProductionGuard:", StringComparison.Ordinal))
+{
+    Console.Error.WriteLine(ex.Message);
+    Environment.ExitCode = 78;
+    return;
+}
+
 // SECURITY FIX (audit 2.3/2.4): registered first so it wraps every other
 // middleware/controller below it - it is the last line of defence for
 // anything that isn't already handled by a controller's own try/catch.
+app.UseMiddleware<ChamaLink.API.Middleware.SecurityHeadersMiddleware>();
 app.UseMiddleware<ChamaLink.API.Middleware.GlobalExceptionMiddleware>();
 
 if (app.Environment.IsDevelopment())
@@ -352,23 +522,36 @@ if (app.Environment.IsDevelopment())
 // loopback + kufuta KnownProxies zilizo default kwa sababu kumwacha mtu
 // yeyote atume X-Forwarded-For bila kikomo ni njia ya kuepuka rate limit.
 // Ukiwa nyuma ya Azure/AppGateway/K8s, ongeza IP/subnet ya proxy yako hapa.
-if (!builder.Environment.IsDevelopment())
+// SASISHO16 (USALAMA): zamani orodha ZOTE mbili (KnownNetworks + KnownProxies) zilifutwa. Kwa ASP.NET Core,
+// orodha tupu = X-Forwarded-For inakubaliwa kutoka KWA MTU YEYOTE: mshambulizi angebadilisha IP yake kila ombi
+// na kukwepa kikomo cha login (5/dakika kwa IP). Sasa header hizi zinaaminiwa TU kutoka proxy zilizotajwa
+// kwenye "Network:TrustedProxies" (IP) / "Network:TrustedNetworks" (CIDR). Zisipotajwa — hazitumiki kabisa.
 {
-    var fwdOptions = new ForwardedHeadersOptions
+    var trustedProxies = app.Configuration.GetSection("Network:TrustedProxies").Get<string[]>() ?? Array.Empty<string>();
+    var trustedNetworks = app.Configuration.GetSection("Network:TrustedNetworks").Get<string[]>() ?? Array.Empty<string>();
+    if (trustedProxies.Length + trustedNetworks.Length > 0)
     {
-        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-    };
-    fwdOptions.KnownNetworks.Clear();
-    fwdOptions.KnownProxies.Clear();
-    // TODO(kuhamia production): ongeza hapa proxy zako halisi, mfano
-    // fwdOptions.KnownProxies.Add(IPAddress.Parse("10.0.0.1"));
-    app.UseForwardedHeaders(fwdOptions);
+        var fwdOptions = new ForwardedHeadersOptions
+        {
+            ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+            ForwardLimit = 1
+        };
+        fwdOptions.KnownNetworks.Clear();
+        fwdOptions.KnownProxies.Clear();
+        foreach (var ip in trustedProxies) fwdOptions.KnownProxies.Add(System.Net.IPAddress.Parse(ip.Trim()));
+        foreach (var cidr in trustedNetworks)
+        {
+            var parts = cidr.Trim().Split('/');
+            fwdOptions.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(System.Net.IPAddress.Parse(parts[0]), int.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture)));
+        }
+        app.UseForwardedHeaders(fwdOptions);
+    }
 }
 
 app.UseHttpsRedirection();
 app.UseCors("Frontend");
-app.UseRateLimiter();
 app.UseAuthentication(); // Must be before UseAuthorization
+app.UseRateLimiter();     // baada ya Authentication: kikomo kwa kila mtumiaji (si kwa IP ya CGNAT)
 app.UseAuthorization();
 app.MapControllers();
 

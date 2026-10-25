@@ -333,8 +333,7 @@ namespace ChamaLink.API.Controllers
             {
                 return BadRequest(new
                 {
-                    message = "Tafadhali pakia angalau faili moja: " +
-                              "taarifa ya M-Koba (PDF) au Excel ya mtunza-hazina."
+                    message = "Tafadhali pakia angalau faili moja: taarifa ya M-Koba (PDF) au Excel ya mtunza-hazina."
                 });
             }
 

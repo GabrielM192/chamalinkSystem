@@ -12,6 +12,10 @@ public class GroupMember
     public DateTime? MemberNumberIssuedAt { get; set; }
     public GroupRole Role { get; set; } = GroupRole.Member; // Changed string to GroupRole
     public MemberStatus Status { get; set; } = MemberStatus.New;
+    /// <summary>SASISHO17: kiongozi mpya anapata nguvu za kuidhinisha kuanzia saa hii (kipindi cha kusubiri). Null = tangu zamani.</summary>
+    public DateTime? LeaderPowersFrom { get; set; }
+    /// <summary>SASISHO17: akaunti (User) iliunganishwa na rekodi hii lini. Null = kabla ya SASISHO17.</summary>
+    public DateTime? AccountLinkedAt { get; set; }
     public int TotalContributionsCount { get; set; } = 0;
     public decimal AdvanceBalance { get; set; } = 0m;
 

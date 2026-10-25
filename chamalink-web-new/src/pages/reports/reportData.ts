@@ -1,4 +1,5 @@
 import type { Cashbook, GroupTruth, MemberTruth, PeriodStatus, TruthSettings } from '../../api/truth';
+import { csvCell } from '../../lib/csv';
 import { monthLabel, num, tsh, wallDate } from '../../lib/truth';
 
 import { t } from '../../i18n';
@@ -175,7 +176,7 @@ export function whatsappSummary(
 }
 
 export function downloadCsv(filename: string, head: string[], rows: (string | number)[][]) {
-  const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+  const esc = csvCell; // SASISHO16: salama dhidi ya fomula
   const body = [head.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join('\n');
   const blob = new Blob(['\ufeff' + body], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');

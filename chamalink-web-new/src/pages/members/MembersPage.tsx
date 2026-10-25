@@ -15,9 +15,10 @@ import {
   Smartphone,
   UserCog,
   Check,
+  Gavel,
 } from 'lucide-react';
 import { Tabs, type Tab } from '../../components/Tabs';
-import { Button, Card, EmptyState, Field, Input, Loading, Modal, Notice, Select, Skeleton, Textarea } from '../../components/ui';
+import { Button, Card, DecisionModal, EmptyState, Field, Input, Loading, Modal, Notice, Select, Skeleton, Textarea } from '../../components/ui';
 import { useMyGroups } from '../../hooks/useMyGroups';
 import { useApi } from '../../lib/useApi';
 import { useToast } from '../../lib/toast';
@@ -26,7 +27,11 @@ import { LEADER_ROLES, matches, wallDate } from '../../lib/truth';
 import { apiErrorMessage } from '../../api/truth';
 import {
   addMemberRecord,
-  changeRole,
+  proposeRole,
+  listRoleRequests,
+  voteRole,
+  cancelRoleRequest,
+  type RoleRequestItem,
   decideRequest,
   getGroupProfile,
   getMembersAdmin,
@@ -40,6 +45,8 @@ import {
   type PendingRequest,
 } from '../../api/membership';
 import { PageHeader } from '../truth/TruthProvider';
+import { StatusRequestModal, StatusVotesPanel } from '../../components/benefits/StatusVotes';
+import { memberStatusLabel } from '../../lib/benefits';
 
 import { t, tk } from '../../i18n';
 const ROLE_OPTIONS = ['Member', 'Secretary', 'Treasurer', 'MemberRepresentative', 'Chairperson'] as const;
@@ -66,12 +73,22 @@ export function MembersPage() {
   const requests = useApi(isLeader && activeGroupId ? () => getPendingRequests(activeGroupId) : null, activeGroupId, [version]);
 
   if (!activeGroup || !activeGroupId) return <Loading />;
+  // Kura za hali ya mwanachama (mf. kufukuza = wanachama wote) zinaonekana kwa KILA mwanachama
+  if (!isLeader && tab === 'kura')
+    return (
+      <div className="space-y-5">
+        <PageHeader eyebrow={t("Kura")} icon={Gavel} title={activeGroup.groupName} description={t("Maamuzi ya vyeo na hali ya wanachama yanayohitaji kura yako.")} />
+        <RoleVotesPanel groupId={activeGroupId} version={version} onChanged={bump} />
+        <StatusVotesPanel groupId={activeGroupId} version={version} onChanged={bump} />
+      </div>
+    );
   if (!isLeader) return <Notice tone="warn">{t("Ukurasa huu ni wa viongozi wa kikundi.")}</Notice>;
 
   const TABS: Tab[] = [
     { id: 'orodha', label: tk('Wanachama'), icon: Users },
     { id: 'maombi', label: tk('Maombi ya kujiunga'), icon: Inbox, badge: requests.data?.length ?? 0 },
     { id: 'kodi', label: tk('Kodi na namba'), icon: KeyRound },
+    { id: 'kura', label: tk('Kura'), icon: Gavel },
   ];
   const active = TABS.some((x) => x.id === tab) ? tab : 'orodha';
 
@@ -90,6 +107,12 @@ export function MembersPage() {
       )}
       {active === 'maombi' && (
         <RequestsTab groupId={activeGroupId} rows={requests.data} error={requests.error} members={members.data ?? []} onChanged={bump} />
+      )}
+      {active === 'kura' && (
+        <div className="space-y-5">
+          <RoleVotesPanel groupId={activeGroupId} version={version} onChanged={bump} />
+          <StatusVotesPanel groupId={activeGroupId} version={version} onChanged={bump} />
+        </div>
       )}
       {active === 'kodi' && <CodesTab groupId={activeGroupId} profile={profile.data} error={profile.error} isChair={isChair} onChanged={bump} />}
     </div>
@@ -115,6 +138,7 @@ function MembersTab({
   const [q, setQ] = useState('');
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<MemberRow | null>(null);
+  const [statusFor, setStatusFor] = useState<MemberRow | null>(null);
   const list = useMemo(() => (rows ?? []).filter((m) => matches(q, m.fullName, m.memberNumber, ...m.phones)), [rows, q]);
   const withoutLogin = (rows ?? []).filter((m) => !m.hasLogin).length;
   const legacyNumbers = (rows ?? []).filter((m) => !m.numberIsOfficial).length;
@@ -184,6 +208,12 @@ function MembersTab({
                     {m.hasLogin ? <ShieldCheck size={12} /> : null}
                     {m.hasLogin ? t("Ana akaunti") : t("Hana akaunti")}
                   </span>
+                  {m.status !== 'Active' && (
+                    <span className="rounded-full bg-standing-warn-bg px-2 py-0.5 text-[11px] font-medium text-standing-warn">{memberStatusLabel(m.status)}</span>
+                  )}
+                  <Button size="sm" variant="ghost" icon={Gavel} onClick={() => setStatusFor(m)}>
+                    {t("Hali")}
+                  </Button>
                   {isChair && (
                     <Button size="sm" variant="ghost" icon={UserCog} onClick={() => setEditing(m)}>
                       {t("Nafasi")}
@@ -198,6 +228,15 @@ function MembersTab({
 
       <AddMemberModal open={adding} onClose={() => setAdding(false)} groupId={groupId} onDone={onChanged} />
       <RoleModal member={editing} onClose={() => setEditing(null)} groupId={groupId} onDone={onChanged} />
+      <StatusRequestModal
+        groupId={groupId}
+        member={statusFor}
+        onClose={() => setStatusFor(null)}
+        onDone={() => {
+          setStatusFor(null);
+          onChanged();
+        }}
+      />
     </div>
   );
 }
@@ -368,6 +407,7 @@ function AddMemberModal({ open, onClose, groupId, onDone }: { open: boolean; onC
 function RoleModal({ member, onClose, groupId, onDone }: { member: MemberRow | null; onClose: () => void; groupId: string; onDone: () => void }) {
   const toast = useToast();
   const [role, setRole] = useState<string>('Member');
+  const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastId, setLastId] = useState<string | null>(null);
@@ -375,20 +415,26 @@ function RoleModal({ member, onClose, groupId, onDone }: { member: MemberRow | n
   if (member && member.memberId !== lastId) {
     setLastId(member.memberId);
     setRole(member.role);
+    setReason('');
     setError(null);
   }
   const handOver = role === 'Chairperson' && member?.role !== 'Chairperson';
+  const reasonOk = reason.trim().length >= 3;
 
   async function save() {
     if (!member) return;
     setBusy(true);
     setError(null);
     try {
-      await changeRole(groupId, member.memberId, role);
-      toast(handOver ? t("Uenyekiti umekabidhiwa.") : t("Nafasi imebadilishwa."), 'good');
+      const r = await proposeRole(groupId, member.memberId, role, reason.trim());
+      toast(
+        r.applied
+          ? t("Nafasi imebadilishwa baada ya kura.")
+          : t("Pendekezo limetumwa. Linahitaji kura {0} (wapiga kura {1}).", { 0: r.requiredApprovals, 1: r.eligibleVoters }),
+        'good',
+      );
       onDone();
       onClose();
-      if (handOver) window.location.assign('/');
     } catch (e) {
       setError(apiErrorMessage(e));
     } finally {
@@ -406,13 +452,16 @@ function RoleModal({ member, onClose, groupId, onDone }: { member: MemberRow | n
           <Button variant="secondary" onClick={onClose} disabled={busy}>
             {t("Ghairi")}
           </Button>
-          <Button variant={handOver ? 'danger' : 'primary'} onClick={save} loading={busy} disabled={role === member?.role}>
-            {handOver ? t("Kabidhi uenyekiti") : t("Hifadhi")}
+          <Button variant={handOver ? 'danger' : 'primary'} onClick={save} loading={busy} disabled={role === member?.role || !reasonOk}>
+            {t("Pendekeza")}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
+        <Notice tone="neutral">
+          {t("Kwa usalama, nafasi hazibadilishwi na kiongozi mmoja: pendekezo lako litapigiwa kura na viongozi wengine (si wewe wala mhusika). Wanachama wote wanaarifiwa.")}
+        </Notice>
         <Field label={t("Nafasi")} hint={t("Katibu na Mtunza-hazina wanaweza kuwa zaidi ya mmoja (manaibu).")}>
           <Select value={role} onChange={(e) => setRole(e.target.value)}>
             {ROLE_OPTIONS.map((r) => (
@@ -422,17 +471,104 @@ function RoleModal({ member, onClose, groupId, onDone }: { member: MemberRow | n
             ))}
           </Select>
         </Field>
+        <Field label={t("Sababu")} hint={t("Lazima — itaonekana kwa wapiga kura na kwenye kumbukumbu za ukaguzi.")}>
+          <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("Mf. Amechaguliwa kwenye mkutano wa tarehe 3/10")} />
+        </Field>
         {!member?.hasLogin && role !== 'Member' && (
           <Notice tone="warn">{t("Nafasi ya uongozi inahitaji akaunti. Mtu huyu ajisajili kwanza, kisha umuunganishe kupitia ombi lake.")}</Notice>
         )}
         {handOver && (
-          <Notice tone="overdue" title={t("Unakabidhi uenyekiti")}>
-            {member?.fullName}{' '}{t("atakuwa Mwenyekiti, na wewe utakuwa Mwanachama wa kawaida. Hatua hii inaandikwa kwenye kumbukumbu za ukaguzi.")}
+          <Notice tone="overdue" title={t("Pendekezo la kukabidhi uenyekiti")}>
+            {member?.fullName}{' '}{t("atakuwa Mwenyekiti kura zikitimia. Mamlaka ya kiongozi mpya yanaanza baada ya siku za kusubiri zilizowekwa kwenye kanuni.")}
           </Notice>
         )}
         {error && <Notice tone="overdue">{error}</Notice>}
       </div>
     </Modal>
+  );
+}
+
+/** Kura za vyeo — zinaonekana kwa kila mwanachama (wapiga kura wanaweza kuwa wanachama kama hakuna viongozi). */
+function RoleVotesPanel({ groupId, version, onChanged }: { groupId: string; version: number; onChanged: () => void }) {
+  const toast = useToast();
+  const list = useApi(() => listRoleRequests(groupId), groupId, [version]);
+  const [deciding, setDeciding] = useState<{ item: RoleRequestItem; approve: boolean } | null>(null);
+  if (list.error) return <Notice tone="overdue">{list.error}</Notice>;
+  if (!list.data) return <Skeleton className="h-24" />;
+  const pending = list.data.filter((r) => r.status === 'Pending');
+  const done = list.data.filter((r) => r.status !== 'Pending').slice(0, 10);
+  const roleLine = (r: RoleRequestItem) => `${r.memberName ?? '—'}: ${groupRoleLabel(r.fromRole)} → ${groupRoleLabel(r.toRole)}`;
+  return (
+    <Card title={<span className="inline-flex items-center gap-2"><UserCog size={16} />{t("Kura za vyeo")}</span>} subtitle={t("Mapendekezo ya kubadilisha nafasi za uongozi")}>
+      {pending.length === 0 && <p className="text-sm text-ink-600">{t("Hakuna pendekezo la cheo linalosubiri.")}</p>}
+      <ul className="space-y-3">
+        {pending.map((r) => (
+          <li key={r.id} className="rounded-xl border border-ink-100 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="font-medium text-ink-950">{roleLine(r)}</div>
+                <div className="mt-0.5 text-xs text-ink-600">
+                  {t("Ameomba {0} · {1}", { 0: r.requestedBy ?? '—', 1: wallDate(r.requestedAt) })} · {t("Ndiyo {0}/{1}, Hapana {2}", { 0: r.yes, 1: r.requiredApprovals, 2: r.no })}
+                  {!r.leadersOnly && <> · {t("kura za wanachama")}</>}
+                </div>
+                {r.reason && <p className="mt-1 text-sm text-ink-800">{r.reason}</p>}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {r.canCancel && (
+                  <Button size="sm" variant="secondary" onClick={async () => {
+                    try {
+                      await cancelRoleRequest(groupId, r.id);
+                      toast(t("Pendekezo limeghairiwa."), 'neutral');
+                      onChanged();
+                    } catch (e) {
+                      toast(apiErrorMessage(e), 'overdue');
+                    }
+                  }}>
+                    {t("Ghairi")}
+                  </Button>
+                )}
+                {r.canVote && (
+                  <>
+                    <Button size="sm" variant="danger" onClick={() => setDeciding({ item: r, approve: false })}>{t("Hapana")}</Button>
+                    <Button size="sm" variant="good" onClick={() => setDeciding({ item: r, approve: true })}>{t("Ndiyo")}</Button>
+                  </>
+                )}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+      {done.length > 0 && (
+        <div className="mt-4 border-t border-ink-100 pt-3">
+          <h3 className="text-xs font-semibold uppercase text-ink-600">{t("Yaliyoamuliwa")}</h3>
+          <ul className="mt-2 space-y-1 text-sm">
+            {done.map((r) => (
+              <li key={r.id} className="flex flex-wrap justify-between gap-2">
+                <span>{roleLine(r)}</span>
+                <span className="text-xs text-ink-600">{r.status === 'Approved' ? t("Imeidhinishwa") : t("Imekataliwa")} · {wallDate(r.decidedAt)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <DecisionModal
+        open={!!deciding}
+        approve={!!deciding?.approve}
+        onClose={() => setDeciding(null)}
+        summary={deciding ? roleLine(deciding.item) : ''}
+        onConfirm={async (note) => {
+          if (!deciding) return;
+          try {
+            const res = await voteRole(groupId, deciding.item.id, deciding.approve, note || undefined);
+            toast(res.status === 'Approved' ? t("Kura zimetimia — nafasi imebadilishwa.") : t("Kura yako imerekodiwa."), 'good');
+            setDeciding(null);
+            onChanged();
+          } catch (e) {
+            toast(apiErrorMessage(e), 'overdue');
+          }
+        }}
+      />
+    </Card>
   );
 }
 

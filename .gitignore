@@ -78,3 +78,7 @@ Desktop.ini
 ### EF Core bundles / scripts zilizozalishwa
 *.dacpac
 *.jfm
+
+### SASISHO17.2: nakala za usakinishaji (WEKA/RUDISHA) na hifadhi ya ushahidi - kamwe zisiingie Git wala release
+.akiba_*/
+chamalink-evidence/

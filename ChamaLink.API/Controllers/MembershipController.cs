@@ -12,7 +12,8 @@ namespace ChamaLink.API.Controllers;
 /// USAJILI NA UANACHAMA (AWAMU I).
 ///   Mtu yeyote mwenye akaunti:  groups (kuanzisha kikundi), join (kuomba kujiunga kwa kodi), my-requests
 ///   Viongozi:                   {groupId}/requests, {groupId}/members (kuongeza mwanachama bila akaunti)
-///   Mwenyekiti pekee:           short-code, join-code, nafasi (role), kutoa namba rasmi, kuidhinisha Katibu/Mtunza-hazina
+///   Mwenyekiti pekee:           short-code, join-code, kutoa namba rasmi
+///   Vyeo:                       role-requests (pendekezo + kura; hakuna mtu mmoja anayetoa cheo)
 /// Ruhusa zinakaguliwa ndani ya MembershipService (dhidi ya DB, si JWT), kwa hiyo nafasi ikibadilishwa inafanya kazi mara moja.
 /// Kila kitendo kinaandika AuditEvent.
 /// </summary>
@@ -22,7 +23,8 @@ namespace ChamaLink.API.Controllers;
 public class MembershipController : ControllerBase
 {
     private readonly MembershipService _svc;
-    public MembershipController(MembershipService svc) => _svc = svc;
+    private readonly RoleChangeService _roles;
+    public MembershipController(MembershipService svc, RoleChangeService roles) { _svc = svc; _roles = roles; }
 
     // ---------------------------------------------------------------- Mtu yeyote mwenye akaunti
 
@@ -103,11 +105,33 @@ public class MembershipController : ControllerBase
     public async Task<IActionResult> AddMember(Guid groupId, [FromBody] AddMemberRequest req, CancellationToken ct)
         => Ok(await _svc.AddMemberRecordAsync(groupId, req.FullName, req.Phone, req.JoinedAt, User.GetUserId(), ct));
 
-    public sealed record RoleRequest(string Role);
+    // ---------------------------------------------------------------- Vyeo: pendekezo + kura (SASISHO17, NEW-2)
+    // PUT {groupId}/members/{memberId}/role (Mwenyekiti mmoja kubadilisha cheo) IMEONDOLEWA kabisa.
 
-    [HttpPut("{groupId:guid}/members/{memberId:guid}/role")]
-    public async Task<IActionResult> ChangeRole(Guid groupId, Guid memberId, [FromBody] RoleRequest req, CancellationToken ct)
-        => Ok(await _svc.ChangeRoleAsync(groupId, memberId, ParseRole(req.Role), User.GetUserId(), ct));
+    public sealed record RoleProposalRequest(Guid MemberId, string Role, string? Reason);
+    public sealed record RoleVoteRequest(bool Approve, string? Reason);
+
+    [HttpGet("{groupId:guid}/role-requests")]
+    public async Task<IActionResult> RoleRequests(Guid groupId, CancellationToken ct)
+        => Ok(await _roles.ListAsync(groupId, User.GetUserId(), ct));
+
+    [HttpPost("{groupId:guid}/role-requests")]
+    public async Task<IActionResult> ProposeRole(Guid groupId, [FromBody] RoleProposalRequest req, CancellationToken ct)
+        => Ok(await _roles.ProposeAsync(groupId, req.MemberId, ParseRole(req.Role), req.Reason, User.GetUserId(), ct));
+
+    [HttpPost("{groupId:guid}/role-requests/{requestId:guid}/vote")]
+    public async Task<IActionResult> VoteRole(Guid groupId, Guid requestId, [FromBody] RoleVoteRequest req, CancellationToken ct)
+    {
+        var r = await _roles.VoteAsync(groupId, requestId, req.Approve, req.Reason, User.GetUserId(), ct);
+        return Ok(new { requestId = r.Id, status = r.Status.ToString() });
+    }
+
+    [HttpDelete("{groupId:guid}/role-requests/{requestId:guid}")]
+    public async Task<IActionResult> CancelRole(Guid groupId, Guid requestId, CancellationToken ct)
+    {
+        await _roles.CancelAsync(groupId, requestId, User.GetUserId(), ct);
+        return NoContent();
+    }
 
     [HttpPost("{groupId:guid}/member-numbers/issue")]
     public async Task<IActionResult> IssueNumbers(Guid groupId, CancellationToken ct)

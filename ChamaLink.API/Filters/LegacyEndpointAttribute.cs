@@ -5,7 +5,7 @@ namespace ChamaLink.API.Filters;
 
 /// <summary>
 /// Inazuia (kwa CODE, si kwa maandishi) endpoints za vizazi vya zamani vya "injini"
-/// (V1 LedgerReclassification/ObligationEngine, V2 AllocationEngine/LedgerEntries).
+/// (V1 — zimefutwa SASISHO17; V2 AllocationEngine/LedgerEntries).
 ///
 /// Kwa nini: Injini ya Ukweli inasoma data GHAFI pekee (MkobaRawTransactions, manual
 /// FinancialEvents zilizoidhinishwa, Loans, TruthAdjustments). Pesa ikiandikwa kupitia
@@ -41,8 +41,8 @@ public sealed class LegacyEndpointAttribute : Attribute, IAsyncResourceFilter
         context.Result = new ObjectResult(new
         {
             message = "Njia hii ni ya mfumo wa zamani na imefungwa: pesa au ripoti zake haziendani na Injini ya Ukweli.",
-            useInstead = UseInstead,
-            howToEnable = $"Kwa uhamisho wa data tu: weka \"{ConfigKey}\" = true kwenye appsettings."
+            useInstead = UseInstead
+            // SASISHO17: jina la swichi ya config HALIONYESHWI tena kwenye jibu (lilikuwa ramani kwa mshambuliaji).
         })
         { StatusCode = StatusCodes.Status410Gone };
     }
